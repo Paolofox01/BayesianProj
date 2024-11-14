@@ -1,0 +1,33 @@
+Latitude,Longitude,Elevation,Local Site Name,County Name,City Name,LandUse,LandSetting
+39.76168,-121.84047,1,Chico-East Avenue,Butte,Chico,IndustrialTraffic,SUBURBAN
+41.560952,-124.083964,235,Redwood NP,Del Norte,Redwood National Park,LowPopulation,RURAL
+38.9248,-119.97,1935,Lake Tahoe Community College,El Dorado,South Lake Tahoe,LowPopulation,RURAL
+36.78538,-119.77321,96,Fresno - Garland,Fresno,Fresno,IndustrialTraffic,URBAN AND CENTER CITY
+37.22064,-119.155557,2598,Kaiser Wilderness,Fresno,Not in a City,LowPopulation,RURAL
+32.67618,-115.48307,1,Calexico-Ethel Street,Imperial,Calexico,ResidentialAgri,SUBURBAN
+37.360684,-118.330783,1257,White Mountain Research Center - Owens Valley Lab,Inyo,Not in a City,ResidentialAgri,RURAL
+35.356615,-119.062613,0,Bakersfield-California,Kern,Bakersfield,IndustrialTraffic,URBAN AND CENTER CITY
+34.821922,-118.887598,1,Lebec-Peace Valley/Frazier Park Roads,Kern,Lebec,IndustrialTraffic,RURAL
+34.06659,-118.22688,87,Los Angeles-North Main Street,Los Angeles,Los Angeles,ResidentialAgri,URBAN AND CENTER CITY
+34.813034,-118.884819,1,Lebec,Los Angeles,Not in a City,IndustrialTraffic,RURAL
+38.122979,-122.90944,76,Point Reyes NS Ranger Station,Marin,Point Reyes National Seashore,LowPopulation,RURAL
+37.71325,-119.7062,1599,Yosemite NP - Turtleback Dome,Mariposa,Not in a City,LowPopulation,RURAL
+38.088023,-119.178069,2561,Hoover Wilderness,Mono,Not in a City,LowPopulation,RURAL
+33.83062,-117.93845,10,Anaheim,Orange,Anaheim,ResidentialAgri,SUBURBAN
+39.81336,-120.47069,8,Portola,Plumas,Portola,ResidentialAgri,SUBURBAN
+33.99958,-117.41601,250,Rubidoux,Riverside,Rubidoux,ResidentialAgri,SUBURBAN
+33.463644,-116.971457,508,Aqua Tibia Wilderness,Riverside,Not in a City,LowPopulation,RURAL
+38.613779,-121.368014,8,Sacramento-Del Paso Manor,Sacramento,Arden-Arcade,ResidentialAgri,SUBURBAN
+38.56844,-121.49311,0,Sacramento-1309 T Street,Sacramento,Sacramento,ResidentialAgri,URBAN AND CENTER CITY
+36.48324,-121.15688,317,Pinnacles NP - Southwest of East Entrance Station,San Benito,Not in a City,LowPopulation,RURAL
+34.10002,-117.49201,381,Fontana,San Bernardino,Fontana,IndustrialTraffic,SUBURBAN
+34.06957,-116.38893,1243,Joshua Tree NP - Black Rock,San Bernardino,Not in a City,LowPopulation,RURAL
+32.789565,-116.944308,141,El Cajon - Lexington Elementary School,San Diego,El Cajon,IndustrialTraffic,SUBURBAN
+34.733889,-120.008349,957,San Rafael Wilderness,Santa Barbara,Not in a City,LowPopulation,RURAL
+37.348497,-121.894898,31,San Jose - Jackson,Santa Clara,San Jose,IndustrialTraffic,URBAN AND CENTER CITY
+40.53999,-121.57646,1755,Lassen Volcanic NP - Manzanita Lake Fire Station,Shasta,Not in a City,LowPopulation,RURAL
+41.711825,-121.509993,1451,Lava Beds National Monument,Siskiyou,Lava Beds National Monument,ResidentialAgri,RURAL
+37.642165,-120.994212,27,Modesto-14th Street,Stanislaus,Modesto,IndustrialTraffic,URBAN AND CENTER CITY
+40.786247,-122.805707,1014,Trinity,Trinity,Not in a City,LowPopulation,RURAL
+36.498835,-118.824821,521,Sequoia NP-Ash Mountain,Tulare,Sequoia National Park,LowPopulation,RURAL
+36.332178999999996,-119.291228,97,Visalia-Church,Tulare,Visalia,IndustrialTraffic,URBAN AND CENTER CITY

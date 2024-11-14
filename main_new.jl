@@ -1,10 +1,15 @@
-using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices
 
-include("fit_rpagp.jl")
-include("likelihood.jl")
-include("priors.jl")
-include("proposal_functions.jl")
-include("sampling_functions.jl")
+
+using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV
+
+
+df = CSV.read("./FinalStations.csv", DataFrame; delim=',')
+
+#include("fit_rpagp.jl")
+#include("likelihood.jl")
+#include("priors.jl")
+#include("proposal_functions.jl")
+#include("sampling_functions.jl")
 include("utilities_new.jl")
 
 # Impostazione del seed
@@ -14,27 +19,39 @@ Random.seed!(1008)
 
 # Parametri
 K = 2 #numero di fonti
-n = 20 #numero di siti
+n = 32 #numero di siti
 n_time = 365
 n_sims = 1
 
 
+interc = ones(n)
+x1 = zeros(n)
+x2= zeros(n)
 
-sites = hcat(
-    10.0 .+ 13.0 * rand(n),  # Colonna 1 (valori reali)
-    10.0 .+ 35.0 * rand(n),  # Colonna 2 (valori reali)
-    rand(Bool, n),           # Colonna 3 (binaria)
-    rand(Bool, n),           # Colonna 4 (binaria)
-    rand(Bool, n),           # Colonna 5 (binaria)
-    1.0 .+ 20.0 .* rand(n)     # Colonna 6 (valori reali)
-)
+for cont in 1:n 
+    if df[cont, 8] == "SUBURBAN"
+        x1[cont] = 1
+    end
+    
+    if df[cont, 8] == "URBAN AND CENTER CITY"
+        x2[cont] = 1
+    end
+
+end
+
+
+sites = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2], interc = interc, x1 = x1, x2=x2, Elevation = df[:, 3]))
+  
+maximum(euclid_dist(sites[: , 1], sites[: , 2], n))
+
 # Parametri del modello
 theta = Dict(
-    :rho_f => 4.0,
-    :rho => [3.5, 2.0],
-    :beta => [1.1 -0.5 0.4 -0.5; 0.3 -0.4 0.7 0.2],
-    :tau =>  3 .* rand(n) ,
+    :rho_f => 0.05,
+    :rho => [600.0, 400.0],
+    :beta => [1.1 -0.5 0.4 0.5; 0.3 -0.4 0.7 0.2],
+    :tau =>  20 * rand(n) ,
 )
+
 
 
 # Funzione per generare i dati (devi definire `generate_data` in Julia)
@@ -59,8 +76,19 @@ for n_sources in 1:K
     end
 end
 
+
+for trial in 1:n
+    # Scegli un colore in base al valore di `n_sources` (o `k`)
+
+    plot!(p, 1:n_time, dat[:y][trial, 1, 1:n_time], 
+          linecolor = :red, lw = 3)
+end
+
+plot!(p, 1:n_time, dat[:y][9, 1, 1:n_time], 
+          linecolor = :red, lw = 3)
+
 # Aggiungere la verità (f)
-plot!(p, 1:n_time, dat[:f]', label = "Truth", linecolor = :green, linewidth = 2)
+plot!(p, 1:n_time, dat[:f][2, :], label = "Truth", linecolor = :green, linewidth = 2)
 
 # Modificare l'asse delle x
 xlabel!(p, "Time")
@@ -74,7 +102,7 @@ ylabel!(p, "")
 # legenda e i colori in modo simile.
 
 # Personalizzare la griglia e le etichette degli assi
-plot!(p, legend=:false, grid = false, axis = false, frame = false)
+plot!(p, legend=:false)
 
 #posso mettere top right altriment
 
