@@ -47,9 +47,9 @@ maximum(euclid_dist(sites[: , 1], sites[: , 2], n))
 # Parametri del modello
 theta = Dict(
     :rho_f => 0.05,
-    :rho => [600.0, 400.0],
-    :beta => [1.1 -0.5 0.4 0.5; 0.3 -0.4 0.7 0.2],
-    :tau =>  20 * rand(n) ,
+    :rho => [100.0, 400.0],
+    :beta => [2.5 -.5 -1. -0.1; 0.3 -0.4 -0.7 -0.02],
+    :tau =>  50 * rand(n) .- 25.0
 )
 
 
@@ -64,17 +64,17 @@ dat = generate_data(sites, n, K, n_time, theta)
 # Creare il grafico
 p = plot()
 
-colors = [:blue, :red]  # Aggiungi più colori se necessario
+# colors = [:blue, :red]  # Aggiungi più colori se necessario
 
-# Aggiungi le linee per ogni combinazione di `trial` e `n_sources`
-for n_sources in 1:K
-    for trial in 1:n
-        # Scegli un colore in base al valore di `n_sources` (o `k`)
-        color_index = (n_sources - 1) % length(colors) + 1  # Ciclo sui colori
-        plot!(p, 1:n_time, dat[:y][trial, n_sources, 1:n_time], 
-              linecolor = colors[color_index], lw = 3)
-    end
-end
+# # Aggiungi le linee per ogni combinazione di `trial` e `n_sources`
+# for n_sources in 1:K
+#     for trial in 1:n
+#         # Scegli un colore in base al valore di `n_sources` (o `k`)
+#         color_index = (n_sources - 1) % length(colors) + 1  # Ciclo sui colori
+#         plot!(p, 1:n_time, dat[:y][trial, n_sources, 1:n_time], 
+#               linecolor = colors[color_index], lw = 3)
+#     end
+# end
 
 
 for trial in 1:n
@@ -84,11 +84,10 @@ for trial in 1:n
           linecolor = :red, lw = 3)
 end
 
-plot!(p, 1:n_time, dat[:y][9, 1, 1:n_time], 
-          linecolor = :red, lw = 3)
-
+#plot!(p, 1:n_time, dat[:y][9, 1, 1:n_time], linecolor = :red, lw = 3)
+ 
 # Aggiungere la verità (f)
-plot!(p, 1:n_time, dat[:f][2, :], label = "Truth", linecolor = :green, linewidth = 2)
+plot!(p, 1:n_time, dat[:f][1, :], label = "Truth", linecolor = :green, linewidth = 2)
 
 # Modificare l'asse delle x
 xlabel!(p, "Time")
@@ -107,7 +106,7 @@ plot!(p, legend=:false)
 #posso mettere top right altriment
 
 # Mostrare il grafico
-display(p)
+ display(p)
 
 #####################################################################################
 

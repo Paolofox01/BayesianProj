@@ -34,8 +34,6 @@ function generate_data(sites, n, K, n_time, theta)
             
             gamma_ik = get_gamma(theta[:beta][j , :], car[i, :], w[i])
 
-            println(gamma_ik)
-
             # Calcola K_i usando la funzione get_K_i (presupposta definita)
             K_i = get_K_i(x, Dict(:rho => theta[:rho_f], :tau => theta[:tau][i], :gamma => gamma_ik))
             
