@@ -56,14 +56,18 @@ end
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
 function sq_exp_kernel(x, rho; alpha=1, nugget=0.0)
-    n = length(x)
+    n_time = length(x)
     # Calcolo dell'esponenziale quadratico
-    kernel_values = alpha^2 .* exp.(-rho^2 / 2 * (x .- 1).^2)  # elementwise expo
-    # Costruzione della matrice Toeplitz
-    K = Matrix(Toeplitz(kernel_values, kernel_values))
-    # K = Matrix(K) #la converte in una matrice di tipo normale
-    # Aggiungi il nugget alla diagonale (per evitare problemi di numeri non invertibili)
-    K += nugget .* I(n)   
+    K = Matrix{Float64}(undef, n_time, n_time)
+
+    # Popola la matrice K
+    for i in 1:n_time
+        for j in 1:n_time
+            K[i, j] = alpha^2 * exp(-rho^2 / 2 * (x[i] - x[j])^2)
+        end
+    end
+
+    K += nugget .* I(n_time)   
     
     return K
 end
@@ -120,7 +124,7 @@ end
 #' @param K_f_inv Inverse covariance matrix of f.
 function get_g_hat(i, f, theta, K_f_inv)
     # Definisce x come una sequenza di valori tra 0 e 1, con lunghezza uguale a quella di f
-    x = range(1, stop=365, length=length(f))
+    x = range(1, stop=365, length=size(f, 1))
     
     # Calcola K_i usando la funzione get_K_i (presupposta definita)
     K_i = get_K_i(x, Dict(:tau => theta[:tau][i], :gamma => theta[:beta][i], :rho => theta[:rho]))
@@ -138,11 +142,11 @@ end
 #' @param K_f_inv Inverse covariance matrix of f (n_time x n_time).
 function get_g_hat_matrix(g, f, theta, K_f_inv)
     # Inizializza la matrice y_hat con il numero di righe e colonne di y
-    g_hat = Matrix{Float64}(undef, size(g, 2), size(g, 1))
+    g_hat = Matrix{Float64}(undef, size(g, 1), size(g, 2))
 
     # Popola ogni colonna di y_hat utilizzando la funzione get_y_hat
     for i in 1:size(g, 1)
-        g_hat[:, i] = get_g_hat(i, f, theta, K_f_inv)
+        g_hat[i, :] = get_g_hat(i, f, theta, K_f_inv)
     end
     
     return g_hat
@@ -155,7 +159,7 @@ end
 function get_Sigma_g_i(beta_i::Float64, K_f::Matrix{Float64})
     # Verifica che K_f e Sigma_nu abbiano le stesse dimensioni
     # Calcola Sigma_y_i
-    r = (beta_i^2) * K_f 
+    r = (beta_i^2) * K_f + 0.01 .* I(size(K_f, 1))
     return r
 end
 
@@ -172,7 +176,7 @@ function getSigma_g_i_f(i, x, theta, K_f, K_f_inv)
     
     # Calcola K_i usando get_K_i (assumendo che questa funzione sia già definita)
     K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:beta][i]))
-    
+
     # Calcola Sigma_i
     Sigma_i = Sigma_g_i - (K_i)' * K_f_inv * K_i
     

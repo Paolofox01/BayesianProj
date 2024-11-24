@@ -15,11 +15,11 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
     chain = Vector{Any}(undef, n_iter)
     chain_f = Vector{Any}(undef, n_iter)
     chain_g_hat = Vector{Any}(undef, n_iter)
+    chain_z = Vector{Any}(undef, n_iter)
     n_time = size(g, 2)
     n = size(g, 1)
     
-    x = LinRange(1, 365, n_time)
-    
+    x = range(1, stop=n_time, length=n_time)
     
     # Inizializzazione della prima iterazione della catena
     chain[1] = theta0
@@ -47,7 +47,8 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
         g_hat = get_g_hat_matrix(g, f, current, K_f_inv)
         
         # Campionamento dei betas
-        current[:beta] = exp.(sample_beta(g, current, g_hat, hyperparam))
+        current[:beta] = sample_beta(g, current, g_hat, hyperparam)
+        
         
         # Campionamento di tau e rho
         f = sample_f(g, current, 1)
@@ -61,13 +62,15 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
         g_hat = get_g_hat_matrix(g, f, current, K_f_inv)
         
         # Calcolo dei residui e campionamento dei parametri dei residui
-        z = g .- g_hat
+        z = g - g_hat
         
         # Registrazione dei campioni dell'iterazione corrente
         chain_f[iter] = f
         chain[iter] = current
         chain_g_hat[iter] = g_hat
         chain_z[iter] = z
+
+        println(iter)
     end
 
     

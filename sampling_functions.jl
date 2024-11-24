@@ -44,8 +44,8 @@ end
 #' @param hyperparam Named list of hyperparameter values.
 #' @param K_f_inv Inverse covariance matrix of f (n_time x n_time).
 function sample_rho(g, f, current, hyperparam)
-    n_time = size(g, 1)
-    x = LinRange(0.0, 1.0, n_time)
+    n_time = size(g, 2)
+    x = range(1, stop=n_time, length=n_time)
     
     proposed = copy(current)
     proposed[:rho] = propose_rho(current[:rho], hyperparam[:rho_proposal_sd])
@@ -81,12 +81,12 @@ end
 #' @param hyperparam Named list of hyperparameter values.
 function sample_beta(g, current, g_hat, hyperparam)
     n = size(g, 1)
-    betas = []
+    betas = zeros(n)
     
     for i in 1:n
-        betas = push!(betas, sample_blr(g[i, :], g_hat[:, i] / current[:beta][i],
+        betas[i] += sample_blr(g[i, :], g_hat[i, :] / current[:beta][i],
                                         hyperparam[:beta_prior_mu], hyperparam[:beta_prior_sd],
-                                        Matrix{Float64}(I, 1, 1), 1, 1)[:beta])
+                                        Matrix{Float64}(I, 1, 1), 1, 1)[:beta][1]
     end
     
     return betas
@@ -101,15 +101,23 @@ end
 #' @param V Prior covariance of coefficients.
 #' @param a Hyperparameter for noise variance.
 #' @param b Hyperparameter for noise variance.
+
+# Ho fatto un po di magheggi con sta funzione perchè per qualche motivo V è una matrice con un uno e non è automatica la conversione matrice reale
+# alla fine sono tutti reali e avrei potuto lasciare solo quelli ma volevo mantenere la generalità per la MV T-student
+# che poi alla fine se fa l'inverse gamma è perchè sa che b_post è uno sclare però bo non l'ho capita la Pluta qui
+
 function sample_blr(g, X, mu, sigma, V, a, b)
-    n = length(g)
-    V_post = inv(inv(V) .+ X' * X)
-    mu_post = V_post * (inv(V) * mu .+ X' * g)
+    n = size(g, 1) # 365 in questo caso, è solo una riga
+    
+    V_post = inv(inv(V) .+ X' * X) # attenzione, qui sia X' * X che V hanno dimensione 1x1 ma per qualche motivo V è passata come matrice, perciò metto .+ per far fare l'addizione, altrimenti va modificato il tipo di V 
+    mu_post = V_post * (inv(V) * mu .+ X' * g) #uguale a sopra
     a_post = a + n / 2
     b_post = b .+ 1 / 2 * (mu' * inv(V) * mu .+ g' * g .- mu_post' * inv(V_post) * mu_post)
     
-    beta = rand(MvNormal(mu_post[:,1], (b_post[1,1] / a_post) * V_post))[1]
-    sigma2 = [rand(InverseGamma(a_post, k)) for k in b_post[:,1]]
+    beta = rand(MvTDist(2 * a_post, mu_post[:, 1], (b_post / a_post) * V_post))
+
+
+    sigma2 = rand(InverseGamma(a_post, b_post[1,1]))
     
     return Dict(:beta => beta, :sigma2 => sigma2)
 end
@@ -124,7 +132,7 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
     n_time = size(g, 2)
     n = size(g, 1)
     chain_f = Vector{Any}(undef, n_draws)
-    x = LinRange(1.0, 365.0, n_time)
+    x = range(1, stop=n_time, length=n_time)
     K_f = sq_exp_kernel(x, theta[:rho], nugget = nugget)
     K_f_inv = inv(K_f)
     
@@ -136,7 +144,7 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
         b = zeros(n_time)
         
         for i in 1:n
-            Sigma_g_i = get_Sigma_g_i((theta[:beta])[i], K_f)
+            Sigma_g_i = get_Sigma_g_i(theta[:beta][i], K_f)
             K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:beta][i]))
             Sigma_i = Sigma_g_i - K_i' * K_f_inv * K_i
             Sigma_i = (Sigma_i + Sigma_i') / 2

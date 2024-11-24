@@ -4,7 +4,7 @@ using Distributions
 #' @param tau Current value of tau.
 #' @param tau_proposal_sd Standard deviation of proposal distribution.
 function propose_tau(tau, tau_proposal_sd)
-    n = length(tau)
+    n = size(tau, 1)
     Sigma = tau_proposal_sd^2 * I(n)  # matrice identità di dimensione n
     proposal = rand(MvNormal(tau, Sigma))  # Genera il campione dalla distribuzione normale multivariata
     return proposal
