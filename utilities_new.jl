@@ -191,32 +191,32 @@ end
 #' @param dat_trials simulated data in long format 
 #' @param y data
 #' @param burn_in burn in 
-function getSummaryOutput(results, dat_trials, y, burn_in)
-    n = size(y, 2)  # Numero di trials
-    n_time = size(y, 1)  # Numero di time points
-    n_iter = length(results.chain)  # Numero di iterazioni
+function getSummaryOutput(results, dat_trials, g, burn_in)
+    n = size(g, 1)  # Numero di trials
+    n_time = size(g, 1)  # Numero di time points
+    n_iter = length(results[:chain])  # Numero di iterazioni
     n_final = n_iter - burn_in  # Iterazioni rimanenti dopo il burn-in
     
     # Ottieni le stime delle prove singole
-    y_hat = getSingleTrialEstimates(results, burn_in)
+    g_hat = getSingleTrialEstimates(results, burn_in, n)
     
     # Definisci i quantili
     probs = [0.025, 0.5, 0.975]
     
     # Inizializza un array per i quantili
-    y_hat_quantiles = Array{Float64}(undef, 3, n_time, n)
+    g_hat_quantiles = Array{Float64}(undef, 3, n, n_time)
     
     # Calcola i quantili per ogni time point e trial
     for ii in 1:n
         for t in 1:n_time
-            y_hat_quantiles[:, t, ii] = quantile(y_hat[t, ii, :], probs)
+            g_hat_quantiles[:, ii, t] = quantile(g_hat[ii, t, :], probs)
         end
     end
     
     # Estrai i quantili
-    lower = reshape(y_hat_quantiles[1, :, :], n_time * n, 1)
-    median = reshape(y_hat_quantiles[2, :, :], n_time * n, 1)
-    upper = reshape(y_hat_quantiles[3, :, :], n_time * n, 1)
+    lower = reshape(g_hat_quantiles[1, :, :], n_time * n, 1)
+    median = reshape(g_hat_quantiles[2, :, :], n_time * n, 1)
+    upper = reshape(g_hat_quantiles[3, :, :], n_time * n, 1)
     
     # Aggiungi i quantili ai dati esistenti
     out = DataFrame(dat_trials)
@@ -231,15 +231,15 @@ end
 #' get singleTrialEstimates 
 #' @param results output from fit_RPAGP
 #' @param burn_in burn_in period
-function getSingleTrialEstimates(results, burn_in)
-    n_iter = length(results.chain)  # Numero di iterazioni
+function getSingleTrialEstimates(results, burn_in, n)
+    n_iter = length(results[:chain])  # Numero di iterazioni
     n_final = n_iter - burn_in  # Iterazioni rimanenti dopo il burn-in
     
     # - Estrazione di beta
     chain_beta_burned = zeros(n, n_final)  # Matrice per beta
     ss = 1
     for tt in (burn_in+1):n_iter
-        chain_beta_burned[:, ss] = results.chain[tt][:beta]  # Beta dalla catena
+        chain_beta_burned[:, ss] = results[:chain][tt][:beta]  # Beta dalla catena
         ss += 1
     end
     
@@ -247,19 +247,19 @@ function getSingleTrialEstimates(results, burn_in)
     chain_f_burned = zeros(n_time, n_final)  # Matrice per f
     ss = 1
     for tt in (burn_in+1):n_iter
-        chain_f_burned[:, ss] = results.chain_f[tt]  # f dalla catena
+        chain_f_burned[:, ss] = results[chain_f][tt]  # f dalla catena
         ss += 1
     end
     
     # - Calcolo di y_hat
-    y_hat = zeros(n_time, n, n_final)  # Array per le stime
+    g_hat = zeros(n, n_time, n_final)  # Array per le stime
     for tt in 1:n_final
         for ii in 1:n
-            y_hat[:, ii, tt] = chain_beta_burned[ii, tt] * chain_f_burned[:, tt]
+            g_hat[ii, :, tt] = chain_beta_burned[ii, tt] * chain_f_burned[:, tt]
         end
     end
     
-    return y_hat
+    return g_hat
 end
 
 

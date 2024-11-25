@@ -1,7 +1,7 @@
 using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV
 
 
-df = CSV.read("./FinalStations.csv", DataFrame; delim=',')
+
 
 include("utilities_new.jl")
 include("fit_rpagp.jl")
@@ -13,9 +13,11 @@ include("likelihood.jl")
 
 function main()
     # Impostazione del seed
+    
+
+    df = CSV.read("./FinalStations.csv", DataFrame; delim=',')
+
     Random.seed!(1008)
-
-
 
     # Parametri
     K = 2 #numero di fonti
@@ -57,8 +59,15 @@ function main()
     # Funzione per generare i dati (devi definire `generate_data` in Julia)
     dat = generate_data(sites, n, K, n_time, theta)
 
-    # Reshaping dei dati (come in R con reshape2::melt)
-    # dat_trials = reshape(dat[:y], n_time, n, n_sims)  # Modifica questo in base alla struttura effettiva dei dati
+    # Creiamo un DataFrame dalla matrice
+    df_new = DataFrame(dat[:g][:, 2, :], :auto)
+
+    # "Melt" della matrice (equivalente a reshape2::melt in R)
+    dat_trials = stack(df_new, variable_name = "time", value_name = "value")
+
+    # Aggiungiamo una colonna per il trial
+    dat_trials.trial = repeat(1:n,n_time)
+
 
     ##########################################################################################
     Random.seed!(1008)
@@ -191,7 +200,7 @@ function main()
 
     # Funzione per riassumere i risultati MCMC
     burn_in = Int(0.6 * n_iter)  # Calcolare il burn-in (primo 60%)
-    out_sim = getSummaryOutput(results, dat_trials, dat.y, burn_in)
+    out_sim = getSummaryOutput(results, DataFrame(dat), dat[:g], burn_in)
 
     #######################################################################################
 
