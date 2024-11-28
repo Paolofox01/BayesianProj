@@ -1,8 +1,5 @@
 using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV
 
-
-
-
 include("utilities_new.jl")
 include("fit_rpagp.jl")
 include("priors_new.jl")
@@ -10,6 +7,7 @@ include("proposal_functions.jl")
 include("sampling_functions.jl")
 include("priors_new.jl")
 include("likelihood.jl")
+
 
 function main()
     # Impostazione del seed
@@ -169,24 +167,25 @@ function main()
 
     # Iperparametri per MCMC
     hyperparam = Dict(
-        :tau_prior_sd => 4, 
+        :tau_prior_sd => sqrt(3), 
         :tau_proposal_sd => 0.1,
         :rho_prior_shape => 5, 
-        :rho_prior_scale => 0.01,
-        :rho_proposal_sd => 0.01, 
-        :beta_prior_mu => 1, 
-        :beta_prior_sd => 0.5
+        :rho_prior_scale => 0.02,
+        :rho_proposal_sd => 0.03, 
+        #:beta_prior_mu => 0, 
+        #:beta_prior_sd => 1
+        :beta_proposal_sd => 0.1
     )
 
     theta_true = Dict(
         :rho => 0.1,
         :beta => dat[:gamma][:, 1],
-        :tau => rand(Normal(0, 3), n)
+        :tau => theta[:tau]
     )
 
     theta0 = Dict(
-        :rho => 0.1,
-        :beta => exp.(ones(n)), 
+        :rho => 0.15,
+        :beta => (ones(n)), 
         :tau => zeros(n)
     )
 
@@ -195,12 +194,12 @@ function main()
     pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
 
     # Iterazioni di MCMC
-    n_iter = 3000
-    results = fit_rpagp(dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
+    n_iter = 1000
+    results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC
     burn_in = Int(0.6 * n_iter)  # Calcolare il burn-in (primo 60%)
-    out_sim = getSummaryOutput(results, DataFrame(dat), dat[:g], burn_in)
+    out_sim, mean_f = getSummaryOutput(results, dat_trials, dat[:g][:,1,:], burn_in)
 
     #######################################################################################
 
@@ -219,44 +218,67 @@ function main()
     plot!(dat_trials.time, dat_trials.value, label="Observed Data", alpha=0.25, linewidth=1)
 
     # Linea per il valore stimato della funzione f
-    plot!(out_sim_summary.time, out_sim_summary.med, label="Estimated f", linewidth=2, color=:chartreuse)
+    plot!(out_sim_summary.time, out_sim_summary.med_median, label="Estimated f", linewidth=2, color=:chartreuse)
 
-    # Linea per il valore della "verità" f
-    plot!(1:n_time, dat.f, label="Truth", linestyle=:dash, linewidth=2, color=:darkgreen)
+    plot!(out_sim_summary.time, mean_f, label="Estimated f", linewidth=2, color=:chartreuse)
+
+    
+    #plot!(out_sim_summary.time,sample_f(dat[:g][:,1,:], theta0, 1), label="Estimated f", linewidth=2, color=:chartreuse)
 
     # Linea per la media empirica
-    plot!(dat_trials_summary.time, dat_trials_summary.value_mean, label="Empirical Mean", linestyle=:dot, linewidth=2, color=:black)
-
-    # Impostazioni finali del grafico
-    xlabel!("Time")
-    ylabel!("")
-
-    # Personalizzare la legenda
-    plot!(label=["Weekly Forecast", "Main Forecast", "ciao"], 
-        linewidth=[1, 2, 2], 
-        linestyle=[:dot, :solid, :dash],
-        color=[:red, :chartreuse, :darkgreen])
-
-    # Impostazioni finali per il tema
-    plot!(grid=false, ticks=false, legend=:topright)
+    #plot!(dat_trials_summary.time, dat_trials_summary.value_mean, label="Empirical Mean", linestyle=:dot, linewidth=2, color=:black)
 
     ############################################################################
 
     # Calcolare la mediana di f_hat (come in R)
-    f_hat = combine(groupby(out_sim, :time), :med => median)
+    #f_hat = combine(groupby(out_sim, :time), :med => median)
 
     # Calcolare la media empirica di f_EMP (come in R)
-    f_EMP = combine(groupby(dat_trials, :time), :value => mean)
+    #f_EMP = combine(groupby(dat_trials, :time), :value => mean)
 
     # Calcolare l'errore quadratico medio per RPAGP
-    MSE_RPAGP = sum((f_hat.med .- dat.f).^2) / n_time
-    println("MSE(RPAGP): ", MSE_RPAGP)
+    #MSE_RPAGP = sum((f_hat.med .- dat.f).^2) / n_time
+    #println("MSE(RPAGP): ", MSE_RPAGP)
 
     # Calcolare l'errore quadratico medio per EMP
-    MSE_EMP = sum((f_EMP.value_mean .- dat.f).^2) / n_time
-    println("MSE(EMP): ", MSE_EMP)
+    #MSE_EMP = sum((f_EMP.value_mean .- dat.f).^2) / n_time
+    #println("MSE(EMP): ", MSE_EMP)
+     p12= plot()
+
+     # Linea per il valore stimato della funzione f
+     plot!(dat_trials.time, dat_trials.value, label="Observed Data", alpha=0.25, linewidth=1)
+
+
+     plot!(out_sim_summary.time, mean_f, label="Estimated f", linewidth=2, color=:chartreuse)
+
+     plot!(p12, 1:n_time, dat[:f][1,:], label="Truth", linestyle=:dash, linewidth=2, color=:darkgreen)
+  
+     display(p12)
+
+
+     p13 = plot()  # Inizializza il grafico
+
+     # Aggiungi i punti per i diversi set di valori
+     scatter!(1:32, theta_true[:beta], label="Theta True", xlabel="Posizione", ylabel="Valore", color=:red, marker=:circle)
+     scatter!(1:32, results[:chain][n_iter][:beta], label="Iter n_iter", color=:blue, marker=:circle)
+     
+     # Mostra il grafico
+     display(p13)
+
+
+     
+
+     p14 = plot()  # Inizializza il grafico
+
+     plot!(1:n_iter-1, autocor([results[:chain][i][:rho] for i in 1:n_iter], 1:n_iter-1; demean=true))
+     
+     # Mostra il grafico
+     display(p14)
+
+  
 
 end
 
 
 main()
+       

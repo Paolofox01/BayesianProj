@@ -10,7 +10,7 @@ using LinearAlgebra
 #' @param pinned_value value of f at the pinned point
 
 # Funzione per il fitting del modello RPAGP (Random Process Approximate GP)
-function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1)
+function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1)
     # Inizializzazione delle catene
     chain = Vector{Any}(undef, n_iter)
     chain_f = Vector{Any}(undef, n_iter)
@@ -22,7 +22,7 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
     x = range(1, stop=n_time, length=n_time)
     
     # Inizializzazione della prima iterazione della catena
-    chain[1] = theta0
+    chain[1] = copy(theta0)
 
   
     chain_f[1] = sample_f(g, chain[1], 1)
@@ -31,28 +31,45 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
     
     start = time()
 
+    
+
+    dist = euclid_dist(sites[:, 1], sites[:, 2], n)
+
+    rho_spatial = 400 # per ora lo metto io a mano
+
+    K_spat = 0.5 * exp.(-1 ./ rho_spatial .* dist)
+
+    M = 1. * I(4)
+
+    M[4,4] = 0.01
+    
+    K_gamma = sites[:, 3:6] * M * sites[:, 3:6]' + K_spat
+
+    K_gamma = (K_gamma' + K_gamma)/2
+
     # Iterazioni
     for iter in 2:n_iter
         if iter % (n_iter ÷ 10) == 0
             println(" ...", floor(Int, (iter / n_iter) * 100), "%")
         end
         
-        current = chain[iter - 1]
+        current = copy(chain[iter - 1])
         
         # Campionamento di f e ridimensionamento
-        f = sample_f(g, current, 1)
-        f .= pinned_value * f ./ f[pinned_point]
+        #f = sample_f(g, current, 1)
+        #f .= pinned_value * f ./ f[pinned_point]
         
         # Aggiornamento di y_hat
-        g_hat = get_g_hat_matrix(g, f, current, K_f_inv)
+        #g_hat = get_g_hat_matrix(g, f, current, K_f_inv)
         
         # Campionamento dei betas
-        current[:beta] = sample_beta(g, current, g_hat, hyperparam)
-        
+        #  current[:beta] = sample_beta(g, current, g_hat, hyperparam)
         
         # Campionamento di tau e rho
         f = sample_f(g, current, 1)
-        f .= pinned_value * f ./ f[pinned_point]
+        # f .= pinned_value * f ./ f[pinned_point]
+
+        current[:beta] = sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_gamma)
         current[:tau] = sample_tau(g, f, current, hyperparam, K_f, K_f_inv)
         current[:rho] = sample_rho(g, f, current, hyperparam)
         K_f = sq_exp_kernel(x, current[:rho], nugget = 1e-6)
@@ -65,12 +82,12 @@ function fit_rpagp(g, n_iter, theta0, hyperparam, pinned_point, pinned_value = 1
         z = g - g_hat
         
         # Registrazione dei campioni dell'iterazione corrente
-        chain_f[iter] = f
-        chain[iter] = current
-        chain_g_hat[iter] = g_hat
-        chain_z[iter] = z
+        chain_f[iter] = copy(f)
+        chain[iter] = copy(current)
+        chain_g_hat[iter] = copy(g_hat)
+        chain_z[iter] = copy(z)
 
-        println(iter)
+        # println(iter, "   ", current[:rho])
     end
 
     

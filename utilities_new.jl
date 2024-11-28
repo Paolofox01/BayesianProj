@@ -35,6 +35,7 @@ function generate_data(sites, n, K, n_time, theta)
             
             gamma[i, j] = get_gamma(theta[:beta][j , :], car[i, :], w[i])
 
+
             # Calcola K_i usando la funzione get_K_i (presupposta definita)
             K_i = get_K_i(x, Dict(:rho => theta[:rho_f], :tau => theta[:tau][i], :gamma => gamma[i, j]))
             
@@ -159,7 +160,7 @@ end
 function get_Sigma_g_i(beta_i::Float64, K_f::Matrix{Float64})
     # Verifica che K_f e Sigma_nu abbiano le stesse dimensioni
     # Calcola Sigma_y_i
-    r = (beta_i^2) * K_f + 0.01 .* I(size(K_f, 1))
+    r = (beta_i^2) * K_f + 0.1 .* I(size(K_f, 1))
     return r
 end
 
@@ -193,13 +194,17 @@ end
 #' @param burn_in burn in 
 function getSummaryOutput(results, dat_trials, g, burn_in)
     n = size(g, 1)  # Numero di trials
-    n_time = size(g, 1)  # Numero di time points
+    n_time = size(g, 2)  # Numero di time points
     n_iter = length(results[:chain])  # Numero di iterazioni
     n_final = n_iter - burn_in  # Iterazioni rimanenti dopo il burn-in
     
     # Ottieni le stime delle prove singole
-    g_hat = getSingleTrialEstimates(results, burn_in, n)
+    GSTE = getSingleTrialEstimates(results, burn_in, n, n_time)
     
+    g_hat = GSTE[:g_hat]
+
+    f_hat = GSTE[:chain_f_burned]
+
     # Definisci i quantili
     probs = [0.025, 0.5, 0.975]
     
@@ -214,24 +219,26 @@ function getSummaryOutput(results, dat_trials, g, burn_in)
     end
     
     # Estrai i quantili
-    lower = reshape(g_hat_quantiles[1, :, :], n_time * n, 1)
-    median = reshape(g_hat_quantiles[2, :, :], n_time * n, 1)
-    upper = reshape(g_hat_quantiles[3, :, :], n_time * n, 1)
-    
+    lower = Vector(reshape(g_hat_quantiles[1, :, :], n_time * n))
+    median = Vector(reshape(g_hat_quantiles[2, :, :], n_time * n))
+    upper = Vector(reshape(g_hat_quantiles[3, :, :], n_time * n))
+    mean_f= vec(mean(f_hat, dims=2))
+
     # Aggiungi i quantili ai dati esistenti
     out = DataFrame(dat_trials)
     out.lwr = lower
     out.med = median
     out.upr = upper
+
     
-    return out
+    return out, mean_f
 end
 
 
 #' get singleTrialEstimates 
 #' @param results output from fit_RPAGP
 #' @param burn_in burn_in period
-function getSingleTrialEstimates(results, burn_in, n)
+function getSingleTrialEstimates(results, burn_in, n, n_time)
     n_iter = length(results[:chain])  # Numero di iterazioni
     n_final = n_iter - burn_in  # Iterazioni rimanenti dopo il burn-in
     
@@ -247,7 +254,7 @@ function getSingleTrialEstimates(results, burn_in, n)
     chain_f_burned = zeros(n_time, n_final)  # Matrice per f
     ss = 1
     for tt in (burn_in+1):n_iter
-        chain_f_burned[:, ss] = results[chain_f][tt]  # f dalla catena
+        chain_f_burned[:, ss] = results[:chain_f][tt]  # f dalla catena
         ss += 1
     end
     
@@ -259,7 +266,7 @@ function getSingleTrialEstimates(results, burn_in, n)
         end
     end
     
-    return g_hat
+    return Dict(:g_hat => g_hat, :chain_f_burned => chain_f_burned)
 end
 
 

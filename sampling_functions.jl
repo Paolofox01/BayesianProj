@@ -155,7 +155,7 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
             A += L' * G
             b += (g[i, :]' * G)[:]
         end
-        
+
         K_f_post = inv(A)
         K_f_post = (K_f_post + K_f_post') / 2
         chain_f[iter] = rand(MultivariateNormal(K_f_post * b, K_f_post))
@@ -163,4 +163,29 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
     
     f_draws = hcat(chain_f...)
     return f_draws
+end
+
+
+function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_gamma)
+    # Proposta del nuovo valore di tau
+    proposed = copy(current)
+    proposed[:beta]= propose_gamma(current[:beta], hyperparam[:beta_proposal_sd])
+    
+    # Calcolo della likelihood e prior per il valore corrente di gamma
+    lik_current = likelihood(g, f, current, K_f, K_f_inv)
+    prior_current = prior[:gamma](current[:beta], K_gamma)
+    
+    # Calcolo della likelihood e prior per il valore proposto di tau
+    lik_proposed = likelihood(g, f, proposed, K_f, K_f_inv)
+    prior_proposed = prior[:gamma](proposed[:beta], K_gamma)
+    
+    # Calcolo della probabilità di accettazione
+    prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+    
+    # Decisione sulla proposta in base alla probabilità
+    if prob > rand()
+        return proposed[:beta]
+    else
+        return current[:beta]
+    end
 end

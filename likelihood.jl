@@ -22,7 +22,6 @@ function likelihood(g, f, theta, K_f, K_f_inv)
         # Calcolo della log-pdf per la densità multivariata normale
         mvn = MvNormal(mu, Sigma_g_i_f)
         tmp += logpdf(mvn, g[i, :])
-
         # println(i)
     end
 
