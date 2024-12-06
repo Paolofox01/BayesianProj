@@ -16,8 +16,9 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
     chain_f = Vector{Any}(undef, n_iter)
     chain_g_hat = Vector{Any}(undef, n_iter)
     chain_z = Vector{Any}(undef, n_iter)
-    n_time = size(g, 2)
-    n = size(g, 1)
+    n_time = size(g, 2) #365
+    n = size(g, 1) #32
+
     
     x = range(1, stop=n_time, length=n_time)
     
@@ -31,21 +32,9 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
     
     start = time()
 
-    
-
     dist = euclid_dist(sites[:, 1], sites[:, 2], n)
 
-    rho_spatial = 400 # per ora lo metto io a mano
-
-    K_spat = 0.5 * exp.(-1 ./ rho_spatial .* dist)
-
-    M = 1. * I(4)
-
-    M[4,4] = 0.01
-    
-    K_gamma = sites[:, 3:6] * M * sites[:, 3:6]' + K_spat
-
-    K_gamma = (K_gamma' + K_gamma)/2
+    K_spat = 0.5 * exp.(-1 ./ theta0[:rho_spacial].* dist)
 
     # Iterazioni
     for iter in 2:n_iter
@@ -68,10 +57,18 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
         # Campionamento di tau e rho
         f = sample_f(g, current, 1)
         # f .= pinned_value * f ./ f[pinned_point]
+        
+        
+        current[:beta] = sample_beta(current, hyperparam, K_spat, sites[:, 3:6])
+        
+        current[:rho_spacial], K_spat = sample_rho_spacial(current, hyperparam, K_spat, sites[:, 3:6], dist)
 
-        current[:beta] = sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_gamma)
+        current[:gamma] = sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_spat, sites[:, 3:6])
+        
         current[:tau] = sample_tau(g, f, current, hyperparam, K_f, K_f_inv)
+        
         current[:rho] = sample_rho(g, f, current, hyperparam)
+        
         K_f = sq_exp_kernel(x, current[:rho], nugget = 1e-6)
         K_f_inv = inv(K_f)
         

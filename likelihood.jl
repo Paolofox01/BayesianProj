@@ -31,3 +31,19 @@ function likelihood(g, f, theta, K_f, K_f_inv)
     out = tmp == -Inf ? -1e10 : tmp
     return out
 end
+
+
+function likelihood_gamma(gamma, beta, K_spat, sites)
+    # n = size(gamma, 1)
+
+    # Calcolo di Sigma_y_i_f usando la funzione getSigma_y_i_f (assumiamo sia definita)
+    mu = sites * beta
+
+    # Calcolo della log-pdf per la densità multivariata normale
+    mvln = MvLogNormal(mu,K_spat)
+    tmp = logpdf(mvln, gamma)
+
+    # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
+    out = tmp == -Inf ? -1e10 : tmp
+    return out
+end

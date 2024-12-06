@@ -1,4 +1,4 @@
-using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV
+using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV, HDF5
 
 include("utilities_new.jl")
 include("fit_rpagp.jl")
@@ -58,7 +58,7 @@ function main()
     dat = generate_data(sites, n, K, n_time, theta)
 
     # Creiamo un DataFrame dalla matrice
-    df_new = DataFrame(dat[:g][:, 2, :], :auto)
+    df_new = DataFrame(dat[:g][:, 1, :], :auto)
 
     # "Melt" della matrice (equivalente a reshape2::melt in R)
     dat_trials = stack(df_new, variable_name = "time", value_name = "value")
@@ -171,21 +171,28 @@ function main()
         :tau_proposal_sd => 0.1,
         :rho_prior_shape => 5, 
         :rho_prior_scale => 0.02,
-        :rho_proposal_sd => 0.03, 
+        :rho_proposal_sd => 0.1, 
         #:beta_prior_mu => 0, 
         #:beta_prior_sd => 1
-        :beta_proposal_sd => 0.1
+        :rho_spacial_prior_shape => 3.0,
+        :rho_spacial_prior_scale => 1000.0,
+        :rho_spacial_proposal_sd => 5.0,
+        :beta_proposal_sd => 0.03,
+        :gamma_proposal_sd => 0.2
     )
 
     theta_true = Dict(
         :rho => 0.1,
-        :beta => dat[:gamma][:, 1],
+        #:rho_spacial => theta[:rho]
+        :gamma => dat[:gamma][:, 1],
         :tau => theta[:tau]
     )
 
     theta0 = Dict(
-        :rho => 0.15,
-        :beta => (ones(n)), 
+        :rho => 0.4,
+        :rho_spacial => 500,
+        :beta => zeros(4),
+        :gamma => (ones(n)), 
         :tau => zeros(n)
     )
 
@@ -199,6 +206,23 @@ function main()
 
     # Funzione per riassumere i risultati MCMC
     burn_in = Int(0.6 * n_iter)  # Calcolare il burn-in (primo 60%)
+
+    # Salvare tutte le matrici in un unico file HDF5
+    h5open("matrici.h5", "w") do file
+        file["g_true"] = dat[:g]
+        file["f_true"] = dat[:f]
+        for i in burn_in+1:n_iter
+            file["f_$i"] = results[:chain_f][i]
+            file["gamma_$i"] = results[:chain][i][:gamma]
+            file["tau_$i"] = results[:chain][i][:tau]
+            file["rho_$i"] = results[:chain][i][:rho]
+            file["g_hat_$i"] = results[:chain_g_hat][i]
+            file["z_$i"] = results[:chain_z][i]
+            file["beta_$i"] = results[:chain][i][:beta]
+            file["rho_spacial_$i"] = results[:chain][i][:rho_spacial]
+        end
+    end
+
     out_sim, mean_f = getSummaryOutput(results, dat_trials, dat[:g][:,1,:], burn_in)
 
     #######################################################################################
@@ -215,7 +239,9 @@ function main()
     plot()
 
     # Linee per i dati osservati (trials)
-    plot!(dat_trials.time, dat_trials.value, label="Observed Data", alpha=0.25, linewidth=1)
+    #plot!(dat_trials.time, out_sim.lwr, label="Observed Data", alpha=0.25, linewidth=1)
+
+    #plot!(dat_trials.time, out_sim.upr, label="Observed Data", alpha=0.25, linewidth=1)
 
     # Linea per il valore stimato della funzione f
     plot!(out_sim_summary.time, out_sim_summary.med_median, label="Estimated f", linewidth=2, color=:chartreuse)
@@ -245,8 +271,10 @@ function main()
     #println("MSE(EMP): ", MSE_EMP)
      p12= plot()
 
-     # Linea per il valore stimato della funzione f
-     plot!(dat_trials.time, dat_trials.value, label="Observed Data", alpha=0.25, linewidth=1)
+
+     plot!(dat_trials.time, out_sim.lwr, label="Observed Data", alpha=0.25, linewidth=1)
+
+     plot!(dat_trials.time, out_sim.upr, label="Observed Data", alpha=0.25, linewidth=1)
 
 
      plot!(out_sim_summary.time, mean_f, label="Estimated f", linewidth=2, color=:chartreuse)
@@ -259,8 +287,8 @@ function main()
      p13 = plot()  # Inizializza il grafico
 
      # Aggiungi i punti per i diversi set di valori
-     scatter!(1:32, theta_true[:beta], label="Theta True", xlabel="Posizione", ylabel="Valore", color=:red, marker=:circle)
-     scatter!(1:32, results[:chain][n_iter][:beta], label="Iter n_iter", color=:blue, marker=:circle)
+     scatter!(1:32, theta_true[:gamma], label="Gamma True", xlabel="Posizione", ylabel="Valore", color=:red, marker=:circle)
+     scatter!(1:32, results[:chain][n_iter][:gamma], label="Gamma n_iter", color=:blue, marker=:circle)
      
      # Mostra il grafico
      display(p13)
@@ -270,7 +298,7 @@ function main()
 
      p14 = plot()  # Inizializza il grafico
 
-     plot!(1:n_iter-1, autocor([results[:chain][i][:rho] for i in 1:n_iter], 1:n_iter-1; demean=true))
+     plot!(1:n_iter, [results[:chain][i][:rho] for i in 1:n_iter])
      
      # Mostra il grafico
      display(p14)
@@ -281,4 +309,4 @@ end
 
 
 main()
-       
+         

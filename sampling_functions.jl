@@ -72,55 +72,55 @@ function sample_rho(g, f, current, hyperparam)
 end
 
 
-# Sample betas.
-#' @param y Matrix of observed trial data (n_time x n).
-#' @param f Vector of f values (n_time).
-#' @param current Named list of current parameter values.
-#' @param K_f_inv Inverse covariance matrix of f (n_time x n_time).
-#' @param y_hat
-#' @param hyperparam Named list of hyperparameter values.
-function sample_beta(g, current, g_hat, hyperparam)
-    n = size(g, 1)
-    betas = zeros(n)
+# # Sample betas.
+# #' @param y Matrix of observed trial data (n_time x n).
+# #' @param f Vector of f values (n_time).
+# #' @param current Named list of current parameter values.
+# #' @param K_f_inv Inverse covariance matrix of f (n_time x n_time).
+# #' @param y_hat
+# #' @param hyperparam Named list of hyperparameter values.
+# function sample_beta(g, current, g_hat, hyperparam)
+#     n = size(g, 1)
+#     betas = zeros(n)
     
-    for i in 1:n
-        betas[i] += sample_blr(g[i, :], g_hat[i, :] / current[:beta][i],
-                                        hyperparam[:beta_prior_mu], hyperparam[:beta_prior_sd],
-                                        Matrix{Float64}(I, 1, 1), 1, 1)[:beta][1]
-    end
+#     for i in 1:n
+#         betas[i] += sample_blr(g[i, :], g_hat[i, :] / current[:beta][i],
+#                                         hyperparam[:beta_prior_mu], hyperparam[:beta_prior_sd],
+#                                         Matrix{Float64}(I, 1, 1), 1, 1)[:beta][1]
+#     end
     
-    return betas
-end
+#     return betas
+# end
 
 
-# One draw from the posterior of a Bayesian Linear Regression.
-#' @param y Response vector.
-#' @param X Design matrix.
-#' @param mu Prior mean of coefficients.
-#' @param sigma Prior standard deviation of coefficients.
-#' @param V Prior covariance of coefficients.
-#' @param a Hyperparameter for noise variance.
-#' @param b Hyperparameter for noise variance.
+# # One draw from the posterior of a Bayesian Linear Regression.
+# #' @param y Response vector.
+# #' @param X Design matrix.
+# #' @param mu Prior mean of coefficients.
+# #' @param sigma Prior standard deviation of coefficients.
+# #' @param V Prior covariance of coefficients.
+# #' @param a Hyperparameter for noise variance.
+# #' @param b Hyperparameter for noise variance.
 
-# Ho fatto un po di magheggi con sta funzione perchè per qualche motivo V è una matrice con un uno e non è automatica la conversione matrice reale
-# alla fine sono tutti reali e avrei potuto lasciare solo quelli ma volevo mantenere la generalità per la MV T-student
-# che poi alla fine se fa l'inverse gamma è perchè sa che b_post è uno sclare però bo non l'ho capita la Pluta qui
+# # Ho fatto un po di magheggi con sta funzione perchè per qualche motivo V è una matrice con un uno e non è automatica la conversione matrice reale
+# # alla fine sono tutti reali e avrei potuto lasciare solo quelli ma volevo mantenere la generalità per la MV T-student
+# # che poi alla fine se fa l'inverse gamma è perchè sa che b_post è uno sclare però bo non l'ho capita la Pluta qui
 
-function sample_blr(g, X, mu, sigma, V, a, b)
-    n = size(g, 1) # 365 in questo caso, è solo una riga
+# function sample_blr(g, X, mu, sigma, V, a, b)
+#     n = size(g, 1) # 365 in questo caso, è solo una riga
     
-    V_post = inv(inv(V) .+ X' * X) # attenzione, qui sia X' * X che V hanno dimensione 1x1 ma per qualche motivo V è passata come matrice, perciò metto .+ per far fare l'addizione, altrimenti va modificato il tipo di V 
-    mu_post = V_post * (inv(V) * mu .+ X' * g) #uguale a sopra
-    a_post = a + n / 2
-    b_post = b .+ 1 / 2 * (mu' * inv(V) * mu .+ g' * g .- mu_post' * inv(V_post) * mu_post)
+#     V_post = inv(inv(V) .+ X' * X) # attenzione, qui sia X' * X che V hanno dimensione 1x1 ma per qualche motivo V è passata come matrice, perciò metto .+ per far fare l'addizione, altrimenti va modificato il tipo di V 
+#     mu_post = V_post * (inv(V) * mu .+ X' * g) #uguale a sopra
+#     a_post = a + n / 2
+#     b_post = b .+ 1 / 2 * (mu' * inv(V) * mu .+ g' * g .- mu_post' * inv(V_post) * mu_post)
     
-    beta = rand(MvTDist(2 * a_post, mu_post[:, 1], (b_post / a_post) * V_post))
+#     beta = rand(MvTDist(2 * a_post, mu_post[:, 1], (b_post / a_post) * V_post))
 
 
-    sigma2 = rand(InverseGamma(a_post, b_post[1,1]))
+#     sigma2 = rand(InverseGamma(a_post, b_post[1,1]))
     
-    return Dict(:beta => beta, :sigma2 => sigma2)
-end
+#     return Dict(:beta => beta, :sigma2 => sigma2)
+# end
 
 
 # Sample from posterior of f.
@@ -144,8 +144,8 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
         b = zeros(n_time)
         
         for i in 1:n
-            Sigma_g_i = get_Sigma_g_i(theta[:beta][i], K_f)
-            K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:beta][i]))
+            Sigma_g_i = get_Sigma_g_i(theta[:gamma][i], K_f)
+            K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:gamma][i]))
             Sigma_i = Sigma_g_i - K_i' * K_f_inv * K_i
             Sigma_i = (Sigma_i + Sigma_i') / 2
             
@@ -166,19 +166,44 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
 end
 
 
-function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_gamma)
+function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_spat, sites)
     # Proposta del nuovo valore di tau
     proposed = copy(current)
-    proposed[:beta]= propose_gamma(current[:beta], hyperparam[:beta_proposal_sd])
+    proposed[:gamma]= propose_gamma(current[:gamma], hyperparam[:gamma_proposal_sd])
     
     # Calcolo della likelihood e prior per il valore corrente di gamma
     lik_current = likelihood(g, f, current, K_f, K_f_inv)
-    prior_current = prior[:gamma](current[:beta], K_gamma)
+    prior_current = prior[:gamma](current[:gamma], K_spat, sites * current[:beta])
     
     # Calcolo della likelihood e prior per il valore proposto di tau
     lik_proposed = likelihood(g, f, proposed, K_f, K_f_inv)
-    prior_proposed = prior[:gamma](proposed[:beta], K_gamma)
+    prior_proposed = prior[:gamma](proposed[:gamma], K_spat, sites * current[:beta])
     
+    # Calcolo della probabilità di accettazione
+    prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+    
+    # Decisione sulla proposta in base alla probabilità
+    if prob > rand()
+        return proposed[:gamma]
+    else
+        return current[:gamma]
+    end
+end
+
+
+function sample_beta(current, hyperparam, K_spat, sites)
+    
+    
+    proposed = copy(current)
+    proposed[:beta]= propose_gamma(current[:beta], hyperparam[:beta_proposal_sd])
+
+    lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
+    prior_current = prior[:beta](current[:beta])
+    
+    # Calcolo della likelihood e prior per il valore proposto di tau
+    lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
+    prior_proposed = prior[:beta](proposed[:beta])
+
     # Calcolo della probabilità di accettazione
     prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
     
@@ -187,5 +212,31 @@ function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_gamma)
         return proposed[:beta]
     else
         return current[:beta]
+    end
+    
+end
+
+
+function sample_rho_spacial(current, hyperparam, K_spat, sites, dist)
+    proposed = copy(current)
+    proposed[:rho_spacial]= propose_rho_spacial(current[:rho_spacial], hyperparam[:rho_spacial_proposal_sd])
+
+    lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)                              
+    prior_current = prior[:rho_spacial](current[:rho_spacial], hyperparam[:rho_spacial_prior_shape], hyperparam[:rho_spacial_prior_scale])
+    
+    K_spat_proposed = 0.5 * exp.(-1 ./ proposed[:rho_spacial].* dist)
+
+    # Calcolo della likelihood e prior per il valore proposto di tau
+    lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat_proposed, sites)
+    prior_proposed = prior[:rho_spacial](proposed[:rho_spacial], hyperparam[:rho_spacial_prior_shape], hyperparam[:rho_spacial_prior_scale])
+
+    # Calcolo della probabilità di accettazione
+    prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+    
+    # Decisione sulla proposta in base alla probabilità
+    if prob > rand()
+        return proposed[:rho_spacial], K_spat_proposed
+    else
+        return current[:rho_spacial], K_spat
     end
 end

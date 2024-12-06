@@ -128,7 +128,7 @@ function get_g_hat(i, f, theta, K_f_inv)
     x = range(1, stop=365, length=size(f, 1))
     
     # Calcola K_i usando la funzione get_K_i (presupposta definita)
-    K_i = get_K_i(x, Dict(:tau => theta[:tau][i], :gamma => theta[:beta][i], :rho => theta[:rho]))
+    K_i = get_K_i(x, Dict(:tau => theta[:tau][i], :gamma => theta[:gamma][i], :rho => theta[:rho]))
     
     # Calcola mu come il prodotto K_i * K_f_inv * f
     mu = K_i * K_f_inv * f
@@ -173,10 +173,10 @@ end
 #' @param Sigma_nu Covariance AR process (n_time x n_time).
 function getSigma_g_i_f(i, x, theta, K_f, K_f_inv)
     # Calcola Sigma_y_i
-    Sigma_g_i = get_Sigma_g_i(theta[:beta][i], K_f)
+    Sigma_g_i = get_Sigma_g_i(theta[:gamma][i], K_f)
     
     # Calcola K_i usando get_K_i (assumendo che questa funzione sia già definita)
-    K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:beta][i]))
+    K_i = get_K_i(x, Dict(:rho => theta[:rho], :tau => theta[:tau][i], :gamma => theta[:gamma][i]))
 
     # Calcola Sigma_i
     Sigma_i = Sigma_g_i - (K_i)' * K_f_inv * K_i
@@ -243,10 +243,10 @@ function getSingleTrialEstimates(results, burn_in, n, n_time)
     n_final = n_iter - burn_in  # Iterazioni rimanenti dopo il burn-in
     
     # - Estrazione di beta
-    chain_beta_burned = zeros(n, n_final)  # Matrice per beta
+    chain_gamma_burned = zeros(n, n_final)  # Matrice per beta
     ss = 1
     for tt in (burn_in+1):n_iter
-        chain_beta_burned[:, ss] = results[:chain][tt][:beta]  # Beta dalla catena
+        chain_gamma_burned[:, ss] = results[:chain][tt][:gamma]  # gamma dalla catena
         ss += 1
     end
     
@@ -262,7 +262,7 @@ function getSingleTrialEstimates(results, burn_in, n, n_time)
     g_hat = zeros(n, n_time, n_final)  # Array per le stime
     for tt in 1:n_final
         for ii in 1:n
-            g_hat[ii, :, tt] = chain_beta_burned[ii, tt] * chain_f_burned[:, tt]
+            g_hat[ii, :, tt] = chain_gamma_burned[ii, tt] * chain_f_burned[:, tt]
         end
     end
     

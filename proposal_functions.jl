@@ -29,3 +29,16 @@ function propose_gamma(gamma, gamma_proposal_sd)
     proposal = abs.(rand(MvNormal(gamma, Sigma)))  # Genera il campione dalla distribuzione normale multivariata
     return proposal
 end
+
+function propose_rho_spacial(rho_spacial, rho_spacial_proposal_sd)
+    proposal = rand(Normal(rho_spacial, rho_spacial_proposal_sd))  # Genera un campione dalla normale
+    return proposal
+end
+
+
+function propose_beta(beta, beta_proposal_sd)
+    n = size(beta, 1)
+    Sigma = beta_proposal_sd^2 * I(n)  # matrice identità di dimensione n
+    proposal = rand(MvNormal(beta, Sigma)) # Genera il campione dalla distribuzione normale multivariata
+    return proposal
+end

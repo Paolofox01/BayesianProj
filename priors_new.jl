@@ -37,28 +37,41 @@ prior[:rho] = function prior_rho(rho, rho_prior_shape, rho_prior_scale)
     return result
 end
 
-prior[:rho_w] = function prior_rho_w(rho_w, rho_w_prior_shape, rho_w_prior_scale)
-    gamma_dist = InverseGamma(rho_w_prior_shape, rho_w_prior_scale)
+prior[:rho_spacial] = function prior_rho_spacial(rho_spacial, rho_spacial_prior_shape, rho_spacial_prior_scale)
+    gamma_dist = InverseGamma(rho_spacial_prior_shape, rho_spacial_prior_scale)
     
     # Calcolo del logaritmo della densità della distribuzione Gamma
-    result = logpdf(gamma_dist, rho_w)
+    result = logpdf(gamma_dist, rho_spacial)
     
     return result
 end
 
 
-prior[:gamma] = function prior_gamma(gamma, K_gamma)
+prior[:gamma] = function prior_gamma(gamma, K_spat, mu)
     
-    result = 0.0
     n = length(gamma)
 
     
     # Definizione della distribuzione normale multivariata
-    mvn = MvLogNormal(zeros(n), K_gamma)
+    mvn = MvLogNormal(mu, K_spat)
     
     # Calcolo del logaritmo della densità
-    result += logpdf(mvn, gamma[1:n])
+    result = logpdf(mvn, gamma[1:n])
     
     return result
 
 end
+
+prior[:beta] = function prior_beta(beta)
+    
+    n=length(beta)
+
+     # Definizione della distribuzione normale multivariata
+    mvn = MvNormal(zeros(n), I(n))
+    
+     # Calcolo del logaritmo della densità
+    result = logpdf(mvn, beta[1:n])
+    
+    return result
+end
+
