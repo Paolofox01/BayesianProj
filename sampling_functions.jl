@@ -195,13 +195,13 @@ function sample_beta(current, hyperparam, K_spat, sites)
     
     
     proposed = copy(current)
-    proposed[:beta]= propose_gamma(current[:beta], hyperparam[:beta_proposal_sd])
+    proposed[:beta]= propose_beta(current[:beta], hyperparam[:beta_proposal_sd])
 
     lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
     prior_current = prior[:beta](current[:beta])
     
     # Calcolo della likelihood e prior per il valore proposto di tau
-    lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
+    lik_proposed = likelihood_gamma(current[:gamma], proposed[:beta], K_spat, sites)
     prior_proposed = prior[:beta](proposed[:beta])
 
     # Calcolo della probabilità di accettazione
@@ -217,26 +217,26 @@ function sample_beta(current, hyperparam, K_spat, sites)
 end
 
 
-function sample_rho_spacial(current, hyperparam, K_spat, sites, dist)
+function sample_rho_spatial(current, hyperparam, K_spat, sites, dist)
     proposed = copy(current)
-    proposed[:rho_spacial]= propose_rho_spacial(current[:rho_spacial], hyperparam[:rho_spacial_proposal_sd])
+    proposed[:rho_spatial]= propose_rho_spatial(current[:rho_spatial], hyperparam[:rho_spatial_proposal_sd])
 
     lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)                              
-    prior_current = prior[:rho_spacial](current[:rho_spacial], hyperparam[:rho_spacial_prior_shape], hyperparam[:rho_spacial_prior_scale])
+    prior_current = prior[:rho_spatial](current[:rho_spatial], hyperparam[:rho_spatial_prior_shape], hyperparam[:rho_spatial_prior_scale])
     
-    K_spat_proposed = 0.5 * exp.(-1 ./ proposed[:rho_spacial].* dist)
+    K_spat_proposed = 0.5 * exp.(-1 ./ proposed[:rho_spatial].* dist)
 
     # Calcolo della likelihood e prior per il valore proposto di tau
     lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat_proposed, sites)
-    prior_proposed = prior[:rho_spacial](proposed[:rho_spacial], hyperparam[:rho_spacial_prior_shape], hyperparam[:rho_spacial_prior_scale])
+    prior_proposed = prior[:rho_spatial](proposed[:rho_spatial], hyperparam[:rho_spatial_prior_shape], hyperparam[:rho_spatial_prior_scale])
 
     # Calcolo della probabilità di accettazione
     prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
     
     # Decisione sulla proposta in base alla probabilità
     if prob > rand()
-        return proposed[:rho_spacial], K_spat_proposed
+        return proposed[:rho_spatial], K_spat_proposed
     else
-        return current[:rho_spacial], K_spat
+        return current[:rho_spatial], K_spat
     end
 end

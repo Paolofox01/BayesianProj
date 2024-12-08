@@ -30,8 +30,8 @@ function propose_gamma(gamma, gamma_proposal_sd)
     return proposal
 end
 
-function propose_rho_spacial(rho_spacial, rho_spacial_proposal_sd)
-    proposal = rand(Normal(rho_spacial, rho_spacial_proposal_sd))  # Genera un campione dalla normale
+function propose_rho_spatial(rho_spatial, rho_spatial_proposal_sd)
+    proposal = rand(Normal(rho_spatial, rho_spatial_proposal_sd))  # Genera un campione dalla normale
     return proposal
 end
 

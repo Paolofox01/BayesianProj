@@ -34,11 +34,11 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
 
     dist = euclid_dist(sites[:, 1], sites[:, 2], n)
 
-    K_spat = 0.5 * exp.(-1 ./ theta0[:rho_spacial].* dist)
+    K_spat = 0.5 * exp.(-1 ./ theta0[:rho_spatial].* dist)
 
     # Iterazioni
     for iter in 2:n_iter
-        if iter % (n_iter ÷ 10) == 0
+        if iter % (n_iter ÷ 100) == 0
             println(" ...", floor(Int, (iter / n_iter) * 100), "%")
         end
         
@@ -61,7 +61,7 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
         
         current[:beta] = sample_beta(current, hyperparam, K_spat, sites[:, 3:6])
         
-        current[:rho_spacial], K_spat = sample_rho_spacial(current, hyperparam, K_spat, sites[:, 3:6], dist)
+        current[:rho_spatial], K_spat = sample_rho_spatial(current, hyperparam, K_spat, sites[:, 3:6], dist)
 
         current[:gamma] = sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_spat, sites[:, 3:6])
         

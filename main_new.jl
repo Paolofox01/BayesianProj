@@ -8,7 +8,6 @@ include("sampling_functions.jl")
 include("priors_new.jl")
 include("likelihood.jl")
 
-
 function main()
     # Impostazione del seed
     
@@ -171,26 +170,26 @@ function main()
         :tau_proposal_sd => 0.1,
         :rho_prior_shape => 5, 
         :rho_prior_scale => 0.02,
-        :rho_proposal_sd => 0.1, 
+        :rho_proposal_sd => 0.07, 
         #:beta_prior_mu => 0, 
         #:beta_prior_sd => 1
-        :rho_spacial_prior_shape => 3.0,
-        :rho_spacial_prior_scale => 1000.0,
-        :rho_spacial_proposal_sd => 5.0,
-        :beta_proposal_sd => 0.03,
-        :gamma_proposal_sd => 0.2
+        :rho_spatial_prior_shape => 3.0,
+        :rho_spatial_prior_scale => 1000.0,
+        :rho_spatial_proposal_sd => 5.0,
+        :beta_proposal_sd => 0.05,
+        :gamma_proposal_sd => 0.1
     )
 
     theta_true = Dict(
         :rho => 0.1,
-        #:rho_spacial => theta[:rho]
+        #:rho_spatial => theta[:rho]
         :gamma => dat[:gamma][:, 1],
         :tau => theta[:tau]
     )
 
     theta0 = Dict(
         :rho => 0.4,
-        :rho_spacial => 500,
+        :rho_spatial => 500,
         :beta => zeros(4),
         :gamma => (ones(n)), 
         :tau => zeros(n)
@@ -201,14 +200,19 @@ function main()
     pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
 
     # Iterazioni di MCMC
-    n_iter = 1000
+    n_iter = 1500
     results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC
     burn_in = Int(0.6 * n_iter)  # Calcolare il burn-in (primo 60%)
 
-    # Salvare tutte le matrici in un unico file HDF5
-    h5open("matrici.h5", "w") do file
+     # Salvare tutte le matrici in un unico file HDF5
+     h5open("matrici.h5", "w") do file
+        file["rho_true"] = theta[:rho_f]
+        file["rho_spatial_true"] = theta[:rho]
+        file["beta_true"] = theta[:beta]
+        file["tau_true"] = theta[:tau]
+        file["gamma_true"] = dat[:gamma]
         file["g_true"] = dat[:g]
         file["f_true"] = dat[:f]
         for i in burn_in+1:n_iter
@@ -219,7 +223,7 @@ function main()
             file["g_hat_$i"] = results[:chain_g_hat][i]
             file["z_$i"] = results[:chain_z][i]
             file["beta_$i"] = results[:chain][i][:beta]
-            file["rho_spacial_$i"] = results[:chain][i][:rho_spacial]
+            file["rho_spatial_$i"] = results[:chain][i][:rho_spatial]
         end
     end
 
@@ -307,6 +311,4 @@ function main()
 
 end
 
-
 main()
-         

@@ -37,11 +37,11 @@ prior[:rho] = function prior_rho(rho, rho_prior_shape, rho_prior_scale)
     return result
 end
 
-prior[:rho_spacial] = function prior_rho_spacial(rho_spacial, rho_spacial_prior_shape, rho_spacial_prior_scale)
-    gamma_dist = InverseGamma(rho_spacial_prior_shape, rho_spacial_prior_scale)
+prior[:rho_spatial] = function prior_rho_spatial(rho_spatial, rho_spatial_prior_shape, rho_spatial_prior_scale)
+    gamma_dist = InverseGamma(rho_spatial_prior_shape, rho_spatial_prior_scale)
     
     # Calcolo del logaritmo della densità della distribuzione Gamma
-    result = logpdf(gamma_dist, rho_spacial)
+    result = logpdf(gamma_dist, rho_spatial)
     
     return result
 end
