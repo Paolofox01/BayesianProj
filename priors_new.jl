@@ -62,15 +62,13 @@ prior[:gamma] = function prior_gamma(gamma, K_spat, mu)
 
 end
 
-prior[:beta] = function prior_beta(beta)
-    
-    n=length(beta)
+prior[:beta_i] = function prior_beta_i(beta)
 
      # Definizione della distribuzione normale multivariata
-    mvn = MvNormal(zeros(n), I(n))
+    mvn = Normal(0, 1)
     
      # Calcolo del logaritmo della densità
-    result = logpdf(mvn, beta[1:n])
+    result = logpdf(mvn, beta)
     
     return result
 end

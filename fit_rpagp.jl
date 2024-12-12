@@ -29,12 +29,16 @@ function fit_rpagp(sites, g, n_iter, theta0, hyperparam, pinned_point, pinned_va
     chain_f[1] = sample_f(g, chain[1], 1)
     K_f = sq_exp_kernel(x, chain[1][:rho], nugget = 1e-9)
     K_f_inv = inv(K_f)
+
+    chain_g_hat[1] = get_g_hat_matrix(g, chain_f[1], theta0, K_f_inv)
+
+    chain_z[1] = g - chain_g_hat[1]
     
     start = time()
 
     dist = euclid_dist(sites[:, 1], sites[:, 2], n)
 
-    K_spat = 0.5 * exp.(-1 ./ theta0[:rho_spatial].* dist)
+    K_spat = exp.(-1 ./ theta0[:rho_spatial].* dist)
 
     # Iterazioni
     for iter in 2:n_iter

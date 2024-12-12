@@ -175,9 +175,9 @@ function main()
         #:beta_prior_sd => 1
         :rho_spatial_prior_shape => 3.0,
         :rho_spatial_prior_scale => 1000.0,
-        :rho_spatial_proposal_sd => 5.0,
-        :beta_proposal_sd => 0.05,
-        :gamma_proposal_sd => 0.1
+        :rho_spatial_proposal_sd => 10.0,
+        :beta_proposal_sd => 0.2,
+        :gamma_proposal_sd => 0.08
     )
 
     theta_true = Dict(
@@ -200,7 +200,7 @@ function main()
     pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
 
     # Iterazioni di MCMC
-    n_iter = 1500
+    n_iter = 10000
     results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC
@@ -215,7 +215,7 @@ function main()
         file["gamma_true"] = dat[:gamma]
         file["g_true"] = dat[:g]
         file["f_true"] = dat[:f]
-        for i in burn_in+1:n_iter
+        for i in 1:n_iter
             file["f_$i"] = results[:chain_f][i]
             file["gamma_$i"] = results[:chain][i][:gamma]
             file["tau_$i"] = results[:chain][i][:tau]
@@ -292,7 +292,7 @@ function main()
 
      # Aggiungi i punti per i diversi set di valori
      scatter!(1:32, theta_true[:gamma], label="Gamma True", xlabel="Posizione", ylabel="Valore", color=:red, marker=:circle)
-     scatter!(1:32, results[:chain][n_iter][:gamma], label="Gamma n_iter", color=:blue, marker=:circle)
+     scatter!(1:32, results[:chain][n_iter][:gamma], label="mean of sampled Gammas", color=:blue, marker=:circle)
      
      # Mostra il grafico
      display(p13)

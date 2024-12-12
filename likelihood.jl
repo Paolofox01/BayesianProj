@@ -40,8 +40,8 @@ function likelihood_gamma(gamma, beta, K_spat, sites)
     mu = sites * beta
 
     # Calcolo della log-pdf per la densità multivariata normale
-    mvln = MvLogNormal(mu,K_spat)
-    tmp = logpdf(mvln, gamma)
+    mvln = MvNormal(mu,K_spat)
+    tmp = logpdf(mvln, log.(gamma))
 
     # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
     out = tmp == -Inf ? -1e10 : tmp

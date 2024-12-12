@@ -193,26 +193,32 @@ end
 
 function sample_beta(current, hyperparam, K_spat, sites)
     
-    
-    proposed = copy(current)
-    proposed[:beta]= propose_beta(current[:beta], hyperparam[:beta_proposal_sd])
+    for i in 1:size(sites, 2)
+        proposed = copy(current)
+        proposed[:beta][i]= propose_beta_i(current[:beta][i], hyperparam[:beta_proposal_sd])
 
-    lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
-    prior_current = prior[:beta](current[:beta])
+        lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)
+        prior_current = prior[:beta_i](current[:beta][i])
     
-    # Calcolo della likelihood e prior per il valore proposto di tau
-    lik_proposed = likelihood_gamma(current[:gamma], proposed[:beta], K_spat, sites)
-    prior_proposed = prior[:beta](proposed[:beta])
+        # Calcolo della likelihood e prior per il valore proposto di tau
+        lik_proposed = likelihood_gamma(current[:gamma], proposed[:beta], K_spat, sites)
+        prior_proposed = prior[:beta_i](proposed[:beta][i])
 
-    # Calcolo della probabilità di accettazione
-    prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
-    
-    # Decisione sulla proposta in base alla probabilità
-    if prob > rand()
-        return proposed[:beta]
-    else
-        return current[:beta]
+        #println(lik_current, "   ",  prior_current, "   ", lik_proposed, "   ", prior_proposed)
+        # Calcolo della probabilità di accettazione
+        prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+
+        if prob > rand()
+            current[:beta] = copy(proposed[:beta])
+        end
+
     end
+
+    #println(lik_proposed + prior_proposed - lik_current - prior_current)
+
+    #println(prob)
+
+    return current[:beta]
     
 end
 
@@ -224,7 +230,7 @@ function sample_rho_spatial(current, hyperparam, K_spat, sites, dist)
     lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)                              
     prior_current = prior[:rho_spatial](current[:rho_spatial], hyperparam[:rho_spatial_prior_shape], hyperparam[:rho_spatial_prior_scale])
     
-    K_spat_proposed = 0.5 * exp.(-1 ./ proposed[:rho_spatial].* dist)
+    K_spat_proposed = exp.(-1 ./ proposed[:rho_spatial].* dist)
 
     # Calcolo della likelihood e prior per il valore proposto di tau
     lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat_proposed, sites)

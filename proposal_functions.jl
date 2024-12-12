@@ -36,9 +36,8 @@ function propose_rho_spatial(rho_spatial, rho_spatial_proposal_sd)
 end
 
 
-function propose_beta(beta, beta_proposal_sd)
-    n = size(beta, 1)
-    Sigma = beta_proposal_sd^2 * I(n)  # matrice identità di dimensione n
-    proposal = rand(MvNormal(beta, Sigma)) # Genera il campione dalla distribuzione normale multivariata
+function propose_beta_i(beta, beta_proposal_sd)
+    Sigma = beta_proposal_sd^2  # matrice identità di dimensione n
+    proposal = rand(Normal(beta, Sigma)) # Genera il campione dalla distribuzione normale multivariata
     return proposal
 end
