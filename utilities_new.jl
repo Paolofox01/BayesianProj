@@ -26,7 +26,7 @@ function generate_data(sites, n, K, n_time, theta)
         # Genera il vettore f dalla distribuzione normale multivariata con media zero e covarianza K_f
         f[j, :] = rand(MvNormal(zeros(n_time), K_f))
     
-        sigma = 0.5 * exp.(-1 ./ theta[:rho][j] .* dist)
+        sigma = exp.(-1 ./ theta[:rho][j] .* dist)
         
         w = rand(MvNormal(zeros(n), sigma))
     
