@@ -12,7 +12,7 @@ include("traceplot.jl")
 
 function data_plot()
     # Specifica i parametri del processo MCMC
-    n_iter = 10000  # Numero totale di iterazioni
+    n_iter = 3000  # Numero totale di iterazioni
     burn_in = Int(0.75 * n_iter)
 
 

@@ -40,7 +40,7 @@ function generate_data(sites, n, K, n_time, theta)
             K_i = get_K_i(x, Dict(:rho => theta[:rho_f], :tau => theta[:tau][i], :gamma => gamma[i, j]))
             
             # Calcola mu come K_i * K_f_inv * f
-            g[i, j, :] = K_i * K_f_inv * f[j, :]
+            g[i, j, :] = K_i * K_f_inv * f[j, :] # f - media_f se media_f != 0 
 
         end
 
@@ -187,6 +187,39 @@ function getSigma_g_i_f(i, x, theta, K_f, K_f_inv)
     return Sigma_i
 end
 
+function get_sigma_loggamma_g(n, n_time, f, K_spat, mu_loggamma, mu_gamma, current, K_f_inv)
+
+    x = range(1, stop=n_time, length=n_time)
+
+    f_matrix = zeros(n, n * n_time)
+
+    mu_f_tau = zeros(n_time) #da modificare se GP troncato
+
+    mu_f = zeros(n_time) #da modificare se GP troncato
+
+    for i in 1:n
+
+        K_f_tau_i_and_f = get_K_i(x, Dict(:rho => current[:rho], :tau => current[:tau][i], :gamma => 1.0))
+
+        mu_f_tau_i_dato_f = mu_f_tau + K_f_tau_i_and_f * K_f_inv * (f - mu_f)
+
+        f_matrix[i, ((i-1)*n_time)+1:i*n_time] = mu_f_tau_i_dato_f
+    end
+
+    loggamma_gamma_matrix = zeros(n, n)
+
+    for i in 1:n
+        for j in 1:n
+
+            loggamma_gamma_matrix[i,j] = exp(mu_loggamma[j] + K_spat[j,j]) * (mu_loggamma[i] + K_spat[i,j])
+            
+        end
+    end
+
+    return loggamma_gamma_matrix * f_matrix - mu_loggamma * mu_gamma' * f_matrix, f_matrix', f_matrix' * mu_gamma
+
+
+end
 #' Summary output MCMC
 #' @param results output from fit_RPAGP
 #' @param dat_trials simulated data in long format 

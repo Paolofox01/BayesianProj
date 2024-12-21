@@ -170,27 +170,26 @@ function main()
         :tau_proposal_sd => 0.1,
         :rho_prior_shape => 5, 
         :rho_prior_scale => 0.02,
-        :rho_proposal_sd => 0.07, 
+        :rho_proposal_sd => 0.05, 
         #:beta_prior_mu => 0, 
         #:beta_prior_sd => 1
         :rho_spatial_prior_shape => 3.0,
         :rho_spatial_prior_scale => 1000.0,
-        :rho_spatial_proposal_sd => 10.0,
-        :beta_proposal_sd => 0.2,
-        :gamma_proposal_sd => 0.08
+        :rho_spatial_proposal_sd => 1.0,
+        :beta_proposal_sd => 0.04,
+        :gamma_proposal_sd => 0.03
     )
 
     theta_true = Dict(
         :rho => 0.1,
         #:rho_spatial => theta[:rho]
         :gamma => dat[:gamma][:, 1],
-        :tau => theta[:tau]
     )
 
     theta0 = Dict(
         :rho => 0.4,
-        :rho_spatial => 500,
-        :beta => zeros(4),
+        :rho_spatial => 500.0,
+        :beta => [0.5, 0.5, 1., -0.1],
         :gamma => (ones(n)), 
         :tau => zeros(n)
     )
@@ -200,7 +199,7 @@ function main()
     pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
 
     # Iterazioni di MCMC
-    n_iter = 10000
+    n_iter = 3000
     results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC

@@ -166,29 +166,64 @@ function sample_f(g, theta, n_draws; nugget = 1e-6)
 end
 
 
-function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_spat, sites)
-    # Proposta del nuovo valore di tau
-    proposed = copy(current)
-    proposed[:gamma]= propose_gamma(current[:gamma], hyperparam[:gamma_proposal_sd])
-    
-    # Calcolo della likelihood e prior per il valore corrente di gamma
-    lik_current = likelihood(g, f, current, K_f, K_f_inv)
-    prior_current = prior[:gamma](current[:gamma], K_spat, sites * current[:beta])
-    
-    # Calcolo della likelihood e prior per il valore proposto di tau
-    lik_proposed = likelihood(g, f, proposed, K_f, K_f_inv)
-    prior_proposed = prior[:gamma](proposed[:gamma], K_spat, sites * current[:beta])
-    
-    # Calcolo della probabilità di accettazione
-    prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
-    
-    # Decisione sulla proposta in base alla probabilità
-    if prob > rand()
-        return proposed[:gamma]
-    else
-        return current[:gamma]
-    end
+function sample_gamma(g, f, current, K_f_inv, K_spat, sites; nugget = 0.0)
+
+    n_time = size(g, 2)
+    n = size(g, 1)
+    x = range(1, stop=n_time, length=n_time)
+
+    mu_loggamma = sites * current[:beta]
+
+    mu_gamma = exp.(mu_loggamma + diag(K_spat) ./ 2)
+
+    K_gamma = Diagonal(mu_gamma) * (exp.(K_spat) .- 1) * Diagonal(mu_gamma)
+
+    K_loggamma_g, f_matrix, mu_g = get_sigma_loggamma_g(n, n_time, f, K_spat, mu_loggamma, mu_gamma, current, K_f_inv)
+
+    K_g = f_matrix * K_gamma * f_matrix' + nugget * I(n*n_time) 
+
+    K_g_inv = inv(K_g)
+
+    mu_loggamma_dato_g = mu_loggamma + K_loggamma_g * K_g_inv * (vec(g) - mu_g) #le g vanno messe in colonna
+
+    cov_loggamma_dato_g = K_spat - K_loggamma_g * K_g_inv * K_loggamma_g'
+
+    cov_loggamma_dato_g = (cov_loggamma_dato_g + cov_loggamma_dato_g')/2
+
+    println(det(cov_loggamma_dato_g))
+
+    println(size(cov_loggamma_dato_g))
+
+    loggamma = rand(MvNormal(mu_loggamma_dato_g, cov_loggamma_dato_g))
+
+    return exp.(loggamma)
+
+
 end
+
+# function sample_gamma(g, f, current, hyperparam, K_f, K_f_inv, K_spat, sites)
+#     # Proposta del nuovo valore di tau
+#     proposed = copy(current)
+#     proposed[:gamma]= propose_gamma(current[:gamma], hyperparam[:gamma_proposal_sd])
+    
+#     # Calcolo della likelihood e prior per il valore corrente di gamma
+#     lik_current = likelihood(g, f, current, K_f, K_f_inv)
+#     prior_current = prior[:gamma](current[:gamma], K_spat, sites * current[:beta])
+    
+#     # Calcolo della likelihood e prior per il valore proposto di tau
+#     lik_proposed = likelihood(g, f, proposed, K_f, K_f_inv)
+#     prior_proposed = prior[:gamma](proposed[:gamma], K_spat, sites * current[:beta])
+    
+#     # Calcolo della probabilità di accettazione
+#     prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+    
+#     # Decisione sulla proposta in base alla probabilità
+#     if prob > rand()
+#         return proposed[:gamma]
+#     else
+#         return current[:gamma]
+#     end
+# end
 
 
 function sample_beta(current, hyperparam, K_spat, sites)
@@ -230,7 +265,7 @@ function sample_rho_spatial(current, hyperparam, K_spat, sites, dist)
     lik_current = likelihood_gamma(current[:gamma], current[:beta], K_spat, sites)                              
     prior_current = prior[:rho_spatial](current[:rho_spatial], hyperparam[:rho_spatial_prior_shape], hyperparam[:rho_spatial_prior_scale])
     
-    K_spat_proposed = exp.(-1 ./ proposed[:rho_spatial].* dist)
+    K_spat_proposed = exp.(-1 ./ proposed[:rho_spatial] .* dist)
 
     # Calcolo della likelihood e prior per il valore proposto di tau
     lik_proposed = likelihood_gamma(current[:gamma], current[:beta], K_spat_proposed, sites)
@@ -238,6 +273,8 @@ function sample_rho_spatial(current, hyperparam, K_spat, sites, dist)
 
     # Calcolo della probabilità di accettazione
     prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
+
+    # println(lik_proposed ," + ", prior_proposed, " - ",  lik_current, " - ",  prior_current, " = ", prob)
     
     # Decisione sulla proposta in base alla probabilità
     if prob > rand()
