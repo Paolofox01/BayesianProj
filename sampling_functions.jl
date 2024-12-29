@@ -190,14 +190,13 @@ function sample_gamma(g, f, current, K_f_inv, K_spat, sites; nugget = 0.0)
 
     cov_loggamma_dato_g = (cov_loggamma_dato_g + cov_loggamma_dato_g')/2
 
-    println(det(cov_loggamma_dato_g))
+    #println(det(cov_loggamma_dato_g))
 
-    println(size(cov_loggamma_dato_g))
+    #println(eigvals(cov_loggamma_dato_g))
 
     loggamma = rand(MvNormal(mu_loggamma_dato_g, cov_loggamma_dato_g))
 
     return exp.(loggamma)
-
 
 end
 

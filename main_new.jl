@@ -199,7 +199,7 @@ function main()
     pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
 
     # Iterazioni di MCMC
-    n_iter = 3000
+    n_iter = 300
     results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC

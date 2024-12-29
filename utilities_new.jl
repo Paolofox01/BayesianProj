@@ -211,7 +211,7 @@ function get_sigma_loggamma_g(n, n_time, f, K_spat, mu_loggamma, mu_gamma, curre
     for i in 1:n
         for j in 1:n
 
-            loggamma_gamma_matrix[i,j] = exp(mu_loggamma[j] + K_spat[j,j]) * (mu_loggamma[i] + K_spat[i,j])
+            loggamma_gamma_matrix[i,j] = exp(mu_loggamma[j] + K_spat[j,j]/2) * (mu_loggamma[i] + K_spat[i,j])
             
         end
     end
