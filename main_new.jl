@@ -201,6 +201,7 @@ function main()
 
     # Iterazioni di MCMC
     n_iter = 1000
+    n_iter = 1000
     results = fit_rpagp(sites, dat[:g][:,1,:], n_iter, theta0, hyperparam, pinned_point, pinned_value)
 
     # Funzione per riassumere i risultati MCMC
