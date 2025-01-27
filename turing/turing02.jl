@@ -2,7 +2,7 @@
 using Pkg, Turing, StatsPlots
 using Distributions, LinearAlgebra, Random, Printf, DataFrames, StatsBase, ToeplitzMatrices
 using Plots, CSV, HDF5
-
+using ForwardDiff
 
 include("utilities_turing.jl")
 include("simulated_data.jl")
@@ -16,9 +16,6 @@ C = 6       # inquinanti
 N = 32      #numero di siti
 T = 30      #365 # istanti temporali
 n_cov = 4   # covariate x
-
-# setting time instances
-days = range(1, stop=T, length=T)
 
 # Set a fixed seed
 seed = 1997
@@ -37,24 +34,31 @@ sample_y = generate_y(dat[:g], seed) # generazione y dato le g generate
 # matrix of distances
 dist = euclid_dist(sites[:, 1], sites[:, 2], N)
 maximum(dist)
-issymmetric(dist)
+#issymmetric(dist)
+
+# setting time instances
+days = range(1, stop=T, length=T)
+
+# design matrix
+X = sites[:,3:6]
+
 
 # TODO: plot degli y per una location. 
 #       Scegliamo una location i* e facciamo multiplot con 6 panels: un panel per time-series di ogni inquinante c=1,..,6
 
 
 # modello Turing
-@model function gp_latent_model(y, K, dist, car, days, ::Type{TV}=Float64) where {TV}
+@model function gp_latent_model(y, K, dist, X, days, ::Type{TV}=Float64) where {TV}
 
     N, T, C = size(y)  # Individui x Tempo x Inquinanti
-    n_cov = size(car,2)
+    n_cov = size(X,2)
     # PARTE I: temporale
     println("\n new iter \n")
 
     rho_time ~ Gamma(1, 0.25)
     Sigma_f = sq_exp_kernel(days, rho_time, nugget = 1e-9)
     Sigma_f_inv = inv(Sigma_f)
-    println("Sigma_f posdef: ", isposdef(Sigma_f))
+    #println("Sigma_f posdef: ", isposdef(Sigma_f))
 
     f = Matrix{Float64}(undef, T, K)  # Preallocazione per f
     for k in 1:K
@@ -63,22 +67,25 @@ issymmetric(dist)
 
     # PARTE 2: spaziale
 
-    K_space = Array{Float64}(undef, N, N, K)
-    rho_space = Array{Float64}(undef, K)  # Preallocazione per K
+    
+    rho_space = Vector{Any}(undef, K)  # Preallocazione per K
+    K_space = Array{Any}(undef, N, N, K)
     for k in 1:K
-        rho_space[k] ~ Gamma(1, 0.2)
-        #rho_space[k] = 0.0024
+        #rho_space[k] ~ Gamma(1, 0.2)
+        rho_space[k] = 0.0024
         K_space[:,:,k] = get_Sigma_gamma(dist, rho_space[k])
     end
     
+    K_space = Float64.(K_space)
     #gamma_ln = Matrix{Float64}(undef, N, K)
     gamma = Matrix{Float64}(undef, N, K)
     beta = Matrix{Float64}(undef, n_cov, K)  
+    mu_gamma = Matrix{Any}(undef, N, K)
     for k in 1:K
         beta[:,k] ~ MvNormal(zeros(n_cov), I(n_cov))
-
+        mu_gamma[:,k] = X[:, :]*beta[:,k]
         # in gamma_ln tenere "Vector{Float64}" altrimenti ci sarà errore
-        gamma[:, k] ~ MvNormal(car[:, :]*beta[:,k], K_space[:,:,k])  
+        gamma[:, k] ~ MvNormal(eltype(beta[1,1]).(mu_gamma[:,k]), K_space[:,:,k])  
     end
     #gamma = exp.(gamma_ln)  # ora avremo e^gamma
 
@@ -88,29 +95,23 @@ issymmetric(dist)
     tau ~ MvNormal(zeros(N), tau_covariance(N, 1)) # 3 preso dal code iniziale, nel main_new
 
     g = Array{Float64, 3}(undef, N, T, K)
-    mu_g = Array{Float64}(undef, T)
-    var_g = Matrix{Float64}(undef,T,T)
+    mu_g = Array{Any}(undef, T)
+    var_g = Matrix{Any}(undef,T,T)
     for k in 1:K
         println("k = ", k)
         for i in 1:N
-            #Sigma_i = get_Sigma_i(i, days, Dict(:rho => rho_time, :tau => tau[i]))
-            #K_i = get_K_i(days, Dict(:rho => rho_time, :tau => tau[i], :gamma => gamma[i, k]))
-
-            #mu_g = Vector{Float64}(K_i* K_f_inv * f[:, k]) # Tx1
             mu_g = get_mu_g(i, days, f[:, k], Dict(:rho => rho_time, :tau => tau, :gamma => gamma[:,k]), Sigma_f_inv)
-            #var_g = (gamma[i,k]^2).*K_f - K_i* K_f_inv *K_i' + 10^(-9)*I(T) # TxT
-            #var_fin = (var_g+var_g')/2 # per simmetrizzare, per ora non funziona
+
             var_g = get_Sigma_g_i(i, days, Dict(:rho => rho_time, :tau => tau, :gamma => gamma[:,k]), Sigma_f, Sigma_f_inv)
-            println("i = ", i, "; var_g posdef: ", isposdef(var_g))
+            #println("i = ", i, "; var_g posdef: ", isposdef(var_g))
             if !isposdef(var_g)
                 println("var_g symm: ", issymmetric(var_g))
                 println(var_g)
                 println(Dict(:rho => rho_time, :tau => tau, :gamma => gamma[:,k]))
-                #println(gamma[:,k])
-                #println(rho_space[k])
-                #println( K_space[:,:,k])
             end
             #g[i, :, k] ~ MvNormal( mu_g , I(T)) # mettere var_fin quando risolviamo Hermitian Matrix error
+            mu_g = eltype(beta[1,1]).(mu_g)
+            var_g = eltype(beta[1,1]).(var_g)
             g[i, :, k] ~ MvNormal( mu_g , var_g)
         end
     end
@@ -118,9 +119,9 @@ issymmetric(dist)
 
     # PARTE IV: costruzione y's
 
-    mu_y = zeros(N, T, C)
-    sigma_y = zeros(C)
-    h = Matrix{Float64}(undef,K,C)
+    mu_y = Array{Any}(undef, N, T, C)
+    sigma_y = Array{Float64}(undef, C)
+    h = Matrix{Any}(undef,K,C)
     for k in 1:K
         h[k,:] ~ Dirichlet(ones(C)) 
     end
@@ -132,7 +133,7 @@ issymmetric(dist)
             for i in 1:N
 
                 mu_y[i,t,c] = sum(h[:,c] .* g[i,t,:])
-                        
+                mu_y[i,t,c] = eltype(beta[1,1]).(mu_y[i,t,c])        
                 y[i,t,c] ~ Normal(mu_y[i,t,c], sigma_y[c])
                 
             end
@@ -141,10 +142,13 @@ issymmetric(dist)
 end
 
 # Start sampling.
-iterations = 10
+num_iterations = 10
 Random.seed!(seed)
 
-chainTrue = sample(gp_latent_model(sample_y, K, dist, car[:,1:3], days), HMC(0.1, 5), iterations)
+#chainTrue = sample(gp_latent_model(sample_y, K, dist, X[:,1:3], days), Prior(), num_iterations) # ok 
+chainTrue = sample(gp_latent_model(sample_y, K, dist, X[:,1:3], days), HMC(0.1,10), num_iterations)
+# ora funziona ma fa loop infinito: fare check!
+
 size(chainTrue)
 
 # Plot a summary of the sampling process for the parameter p, i.e. the probability of heads in a coin.
@@ -189,7 +193,7 @@ for k in 1:K
     beta[:,k] = rand(MvNormal(zeros(n_cov), I(n_cov)))
 
     # in gamma_ln tenere "Vector{Float64}" altrimenti ci sarà errore
-    gamma_ln[:, k] = rand(MvNormal(Vector{Float64}(car[:, :]*beta[:,k]), K_space[:,:,k])  )
+    gamma_ln[:, k] = rand(MvNormal(Vector{Float64}(X[:, :]*beta[:,k]), K_space[:,:,k])  )
 end
 gamma = exp.(gamma_ln)  # ora avremo e^gamma
 
