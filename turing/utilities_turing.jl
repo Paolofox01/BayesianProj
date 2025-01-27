@@ -72,7 +72,7 @@ end
 #' @param rho Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function sq_exp_kernel(t, rho; alpha=1, nugget=0.0)
+function sq_exp_kernel(t, rho, alpha=1, nugget=0.0, ::Type{TV}=Float64) where {TV}
     n_time = length(t)
     # Calcolo dell'esponenziale quadratico
     K = Matrix{Float64}(undef, n_time, n_time)
@@ -100,7 +100,7 @@ end
 #' @param phi Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function get_Sigma_gamma(D, phi; alpha=1, nugget=0.1)
+function get_Sigma_gamma(D, phi, alpha=1, nugget=0.001, ::Type{TV}=Float64) where {TV}
     n_stations = size(D, 1)
     # Calcolo dell'esponenziale quadratico
     K = Matrix{Float64}(undef, n_stations, n_stations)
@@ -123,7 +123,7 @@ end
 
 
 
-function get_Sigma_i(i, t, theta)
+function get_Sigma_i(i, t, theta, ::Type{TV}=Float64) where {TV}
     n_time = length(t)
     K = Matrix{Float64}(undef, n_time, n_time)
 
@@ -168,7 +168,7 @@ end
 
 
 # covarianza tau temporale
-function tau_covariance(n, sigmatau)
+function tau_covariance(n, sigmatau, ::Type{TV}=Float64) where {TV}
 
     I_n = I(n)
     
@@ -184,10 +184,9 @@ end
 #' @param beta_i Trial specific amplitude beta_i
 #' @param Sigma_f Covariance matrix of f. (n_time x n_time)
 #' @param Sigma_nu Covariance AR process (n_time x n_time)
-function get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv)
+function get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv, ::Type{TV}=Float64) where {TV}
 
     Sigma_i = get_Sigma_i(i, t, theta)
-
     K = (exp(theta[:gamma][i])^2) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 0.01 .* I(size(Sigma_f, 1))
     # Simmetrizzo
     K  = (K  + K') / 2
@@ -206,7 +205,7 @@ end
 #' @param theta Named list of parameter values.
 #' @param gamma Vector of values for gamma.
 #' @param Sigma_f_inv Inverse covariance matrix of f.
-function get_mu_g(i, t, f, theta, Sigma_f_inv)
+function get_mu_g(i, t, f, theta, Sigma_f_inv, ::Type{TV}=Float64) where {TV}
     
     # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
     Sigma_i = get_Sigma_i(i, t, theta)
