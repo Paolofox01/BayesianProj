@@ -1,84 +1,143 @@
 using Distributions, LinearAlgebra, Random, Printf, DataFrames, StatsBase, ToeplitzMatrices
 
-
 function generate_data(sites, n, K, n_time, theta)
 
-    car = sites[:, 3:end] # caratteristiche del sito
-    # Genera i valori di x
-    x = range(1, stop=n_time, length=n_time)
-
-    # Calcola K_f usando la funzione sq_exp_kernel (presupposta definita)
-    K_f = sq_exp_kernel(x, theta[:rho_f]; nugget=1e-6)
-    K_f_inv = inv(K_f)
+    X = sites[:, 3:end] # Design matrix: caratteristiche del sito
+    coords = sites[:, 1:2] # coordinate geografiche
+    
+    # Genera i valori di t
+    t = range(1, stop=n_time, length=n_time)
 
     f = zeros(Float64, K, n_time)
     g = zeros(Float64, n, K, n_time)
     gamma = zeros(Float64, n, K)
 
-    dist = euclid_dist(sites[:, 1], sites[:, 2], n)
+    dist = euclid_dist(coords[:, 1], coords[:, 2], n)
 
-    for j in 1:K
-
-        # Genera il vettore f dalla distribuzione normale multivariata con media zero e covarianza K_f
-        f[j, :] = rand(MvNormal(zeros(n_time), K_f))
-    
-        sigma = exp.(-1 ./ theta[:rho][j] .* dist)
-        
-        w = rand(MvNormal(zeros(n), sigma))
-    
+    for k in 1:K
+        theta_k = theta[k]
+        # Calcola Sigma_f usando la funzione sq_exp_kernel (presupposta definita)
+        Sigma_f = sq_exp_kernel(t, theta_k[:rho]; nugget=1e-6)
+        Sigma_f_inv = inv(Sigma_f)
+        # Genera il vettore f dalla distribuzione normale multivariata con media zero e matrice varianza Sigma_f
+        f[k, :] = rand(MvNormal(zeros(n_time), Sigma_f))
+         
+        Sigma_gamma = get_Sigma_gamma(dist, theta_k[:phi])
+        gamma[:, k] = rand(MvNormal(X*theta_k[:beta], Sigma_gamma))
+        theta_k[:gamma] = gamma[:, k]
         # Loop attraverso ciascuna colonna i
         for i in 1:n
-            
-            gamma[i, j] = get_gamma(theta[:beta][j , :], car[i, :], w[i])
+            # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
+            Sigma_i = get_Sigma_i(i, t, theta_k)
 
-
-            # Calcola K_i usando la funzione get_K_i (presupposta definita)
-            K_i = get_K_i(x, Dict(:rho => theta[:rho_f], :tau => theta[:tau][i], :gamma => gamma[i, j]))
-            
-            # Calcola mu come K_i * K_f_inv * f
-            g[i, j, :] = K_i * K_f_inv * f[j, :]
-
+            # Calcola mu come Sigma_i * Sigma_f_inv * f
+            g[i, k, :] = get_mu_g(i, t, f[k,:], theta_k, Sigma_f_inv)
         end
 
     end
     
-    # Restituisce un dizionario contenente le matrici y, f, z, e mu
+    # Restituisce un dizionario contenente le matrici g, f, gamma
     return Dict(:g => g, :f => f, :gamma => gamma)
 end
 
 
-function sq_exp_kernel(x, rho; alpha=1, nugget=0.0)
-    n_time = length(x)
+function generate_y(g, seed)
+    N, K, T = size(g)          
+    C = 6          
+    Random.seed!(seed)         
+    sigma = rand(InverseGamma(3, 2), C) 
+
+    h = zeros(K, C)
+    for k in 1:K
+        h[k, :] = rand(Dirichlet(ones(C)))  # Ogni riga segue una distribuzione Dirichlet
+    end
+
+    mu = zeros(N, T, C)
+    y = zeros(N, T, C)
+
+    for i in 1:N, t in 1:T, c in 1:C
+        mu[i, t, c] = sum(g[i, :, t] .* h[:, c])  # Somma data da g e h
+        y[i, t, c] = rand(Normal(mu[i, t, c], sigma[c]))  # Campiona y
+    end
+
+    return y
+end
+
+
+
+
+#' Generate covariance matrix for square exponential kernel.
+#'
+#' @param t Vector of time points.
+#' @param rho Length scale.
+#' @param alpha Amplitude.
+#' @param nugget Covariance nugget.
+function sq_exp_kernel(t, rho; alpha=1, nugget=0.0)
+    n_time = length(t)
     # Calcolo dell'esponenziale quadratico
     K = Matrix{Float64}(undef, n_time, n_time)
 
     # Popola la matrice K
     for i in 1:n_time
         for j in 1:n_time
-            K[i, j] = alpha^2 * exp(-rho^2 / 2 * (x[i] - x[j])^2)
+            K[i, j] = alpha^2 * exp(- (rho)^2 / 2 * (t[i] - t[j])^2)
         end
     end
-
+    
     K += nugget .* I(n_time)   
+    K = (K + K')/2
     
     return K
 end
 
 
 
-function get_K_i(x, theta)
-    n_time = length(x)
+
+
+#' Generate covariance matrix for square exponential kernel.
+#'
+#' @param D matrix of Euclidean distances.
+#' @param phi Length scale.
+#' @param alpha Amplitude.
+#' @param nugget Covariance nugget.
+function get_Sigma_gamma(D, phi; alpha=1, nugget=0.1)
+    n_stations = size(D, 1)
+    # Calcolo dell'esponenziale quadratico
+    K = Matrix{Float64}(undef, n_stations, n_stations)
+
+    # Popola la matrice K
+    for i in 1:n_stations
+        for j in 1:n_stations
+            K[i, j] = alpha^2 * exp(-phi^2 / 2 * (D[i,j])^2)
+        end
+    end
+    
+    K += nugget .* I(n_stations)   
+    K = (K + K')/2
+    
+    #println(isposdef(K))
+
+    return K
+end
+
+
+
+
+function get_Sigma_i(i, t, theta)
+    n_time = length(t)
     K = Matrix{Float64}(undef, n_time, n_time)
 
     # Popola la matrice K
-    for i in 1:n_time
-        for j in 1:n_time
-            K[i, j] = exp(-theta[:rho]^2 / 2 * (x[i] - x[j] - theta[:tau])^2)
+    for ii in 1:n_time
+        for jj in 1:n_time
+            K[ii, jj] = exp(-theta[:rho]^2 / 2 * (t[ii] - t[jj] - theta[:tau][i])^2)
         end
     end
 
-    return theta[:gamma] .* K
+    #return theta[:gamma] .* K
+    return K
 end
+
 
 
 
@@ -107,6 +166,7 @@ function euclid_dist(x::Vector{Float64}, y::Vector{Float64}, n::Int)
 end
 
 
+
 # covarianza tau temporale
 function tau_covariance(n, sigmatau)
 
@@ -120,23 +180,39 @@ function tau_covariance(n, sigmatau)
 end
 
 
-function generate_y(g)
-    N, K, T = size(g)          
-    C = 6                      
-    sigma = rand(InverseGamma(3, 2), C) 
+#' Get Sigma_g_i (Section 4.6.2)
+#' @param beta_i Trial specific amplitude beta_i
+#' @param Sigma_f Covariance matrix of f. (n_time x n_time)
+#' @param Sigma_nu Covariance AR process (n_time x n_time)
+function get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv)
 
-    h = zeros(K, C)
-    for k in 1:K
-        h[k, :] = rand(Dirichlet(ones(C)))  # Ogni riga segue una distribuzione Dirichlet
-    end
+    Sigma_i = get_Sigma_i(i, t, theta)
 
-    mu = zeros(N, T, C)
-    y = zeros(N, T, C)
+    K = (exp(theta[:gamma][i])^2) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 0.01 .* I(size(Sigma_f, 1))
+    # Simmetrizzo
+    K  = (K  + K') / 2
 
-    for i in 1:N, t in 1:T, c in 1:C
-        mu[i, t, c] = sum(g[i, :, t] .* h[:, c])  # Somma data da g e h
-        y[i, t, c] = rand(Normal(mu[i, t, c], sigma[c]))  # Campiona y
-    end
-
-    return y
+    #println("staz: ", i, "posdef:", isposdef(K))
+    #println("staz: ", i, "symmetric:", issymmetric(K))
+    return K
 end
+
+
+#' Get g_ki mean
+#'
+#' @param i Subject index (scalar, 1 < i < n).
+#' @param t Vector of time instances.
+#' @param f Vector of values for f.
+#' @param theta Named list of parameter values.
+#' @param gamma Vector of values for gamma.
+#' @param Sigma_f_inv Inverse covariance matrix of f.
+function get_mu_g(i, t, f, theta, Sigma_f_inv)
+    
+    # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
+    Sigma_i = get_Sigma_i(i, t, theta)
+    
+    # Calcola mu come il prodotto Sigma_i * Sigma_f_inv * f
+    mu = exp(theta[:gamma][i]) * Sigma_i * Sigma_f_inv * f
+    return mu[:,1]
+end
+

@@ -1,68 +1,38 @@
 
-using Pkg  
-using Turing
-using StatsPlots
-using Random
-using Distributions
-using LinearAlgebra
+using Pkg, Turing, StatsPlots
 using Distributions, LinearAlgebra, Random, Printf, DataFrames, StatsBase, ToeplitzMatrices
 using Plots, CSV, HDF5
 
 
 include("utilities_turing.jl")
+include("simulated_data.jl")
 
 # lettura dei dati
 df = CSV.read("FinalStations.csv", DataFrame; delim=',')
 
-# Parametri dell'analisi
-K = 2 #numero di fonti
-C = 6 # inquinanti
-N = 32 #numero di siti
-T = 365 # istanti temporali
-n_cov = 4  # covariate x 
+# Parametri 
+K = 2       #numero di fonti
+C = 6       # inquinanti
+N = 32      #numero di siti
+T = 30      #365 # istanti temporali
+n_cov = 4   # covariate x
 
-interc = ones(N)
-x1 = zeros(N)
-x2= zeros(N)
+# Set a fixed seed
+seed = 1997
 
-for cont in 1:N
-    if df[cont, 8] == "SUBURBAN"
-        x1[cont] = 1
-    end
     
-    if df[cont, 8] == "URBAN AND CENTER CITY"
-        x2[cont] = 1
-    end
+# generating simulated data
+sites, dat, theta_true, dat_trials = simulate_data(df, seed, K, N, T)
+sizeof(dat)
+names(dat)
+size(dat[:g])
 
-end
+# MF: quiiiii
 
-# siti, 32x6
-sites = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2], interc = interc, x1 = x1, x2=x2, Elevation = df[:, 3]))
+sample_y = generate_y(samples[:g], seed) # generazione y dato le g generate
 
-# caratteristiche del sito (intercetta, x1, x2, Elevation), (da qui beta=2x4)
-car = sites[:, 3:end]  
-
-# Genera i valori di x (giorni)
-days = range(1, stop=T, length=T)
-
-maxdist = maximum(euclid_dist(sites[: , 1], sites[: , 2], N))
-
-# parametri per generazione data
-theta = Dict(
-    :rho_f => 0.1,
-    :rho => [300.0, 400.0],
-    :beta => [0.5 0.5 1. -0.1; 0.3 -0.4 -0.7 -0.02],
-    :tau => rand(Normal(0, 3), N) 
-)
-
-
-# Funzione per generare i dati
-samples = generate_data(sites, N, K, T, theta)
-sizeof(samples)
-names(samples)
-
-sample_y = generate_y(samples[:g]) # generazione y dato le g generate
-
+# TODO: plot degli y per una location. 
+#       Scegliamo una location i* e facciamo multiplot con 6 panels: un panel per time-series di ogni inquinante c=1,..,6
 
 # modello Turing
 @model function gp_latent_model(y, K, sites, car, days)
@@ -71,10 +41,11 @@ sample_y = generate_y(samples[:g]) # generazione y dato le g generate
 
 
     # PARTE I: temporale
-
+    println("\n new iter \n")
     rho_time ~ Gamma(5, 1)
-    K_f = sq_exp_kernel(days, rho_time)
+    K_f = sq_exp_kernel(days, rho_time, nugget = 1e-9)
     K_f_inv = inv(K_f)
+    println("K_f posdef: ", isposdef(K_f))
 
     f = Matrix{Float64}(undef, T, K)  # Preallocazione per f
     for k in 1:K
@@ -112,17 +83,20 @@ sample_y = generate_y(samples[:g]) # generazione y dato le g generate
     var_g = Matrix{Float32}(undef,T,T)
 
     for k in 1:K
+        println("k = ", k)
         for i in 1:N
 
             K_i = get_K_i(days, Dict(:rho => rho_time, :tau => tau[i], :gamma => gamma[i, k]))
 
             mu_g = Vector{Float64}(K_i* K_f_inv * f[:, k]) # Tx1
-            var_g = (gamma[i,k]^2)*K_f - K_i* K_f_inv *K_i' + 10^(-1)*I(T) # TxT
-            
-            var_fin = 0.5*(var_g+var_g') # per simmetrizzare, per ora non funziona
-            
-            g[i, :, k] ~ MvNormal( mu_g , I(p)) # mettere var_fin quando risolviamo Hermitian Matrix error
-        
+            var_g = (gamma[i,k]^2).*K_f - K_i* K_f_inv *K_i' + 10^(-9)*I(T) # TxT
+            var_fin = (var_g+var_g')/2 # per simmetrizzare, per ora non funziona
+            println("i = ", i, "; var_fin posdef: ", isposdef(var_fin))
+            if !isposdef(var_fin)
+                println(var_fin)
+            end
+            #g[i, :, k] ~ MvNormal( mu_g , I(T)) # mettere var_fin quando risolviamo Hermitian Matrix error
+            g[i, :, k] ~ MvNormal( mu_g , var_fin)
         end
     end
 
@@ -152,8 +126,8 @@ sample_y = generate_y(samples[:g]) # generazione y dato le g generate
 end
 
 # Start sampling.
-iterations = 5
-Random.seed!(1998)
+iterations = 10
+Random.seed!(seed)
 
 chainTrue = sample(gp_latent_model(sample_y, K, sites, car, days), Prior(), iterations)
 size(chainTrue)

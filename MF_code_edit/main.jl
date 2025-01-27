@@ -10,8 +10,9 @@ include("target_functions.jl")
 
 
 function main()
-    # Impostazione del seed
-    
+    # Set a fixed seed
+    seed = 1997
+
     df = CSV.read("./FinalStations.csv", DataFrame; delim=',')
 
 
@@ -19,9 +20,8 @@ function main()
     K = 2 #numero di fonti
     n = 32 #numero di siti
     n_time = 30 #365
-    seed = 1997
-
-
+    
+    # generating simulated data
     sites, dat, theta_true, dat_trials = simulate_data(df, seed, K, n, n_time)
 
     
