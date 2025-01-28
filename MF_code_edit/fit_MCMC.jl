@@ -70,7 +70,7 @@ function fit_model(sites, g, n_iter, theta0, hyperparam)
         curr[:gamma] = sample_gamma(t, g, f, curr,  Sigma_f, Sigma_f_inv, Sigma_gamma, X)
         #println("gamma: ", curr[:gamma])
 
-        curr[:tau] = sample_tau(g, f, curr, hyperparam, Sigma_f, Sigma_f_inv)
+        curr[:tau] = sample_tau(t, g, f, curr, hyperparam, Sigma_f, Sigma_f_inv)
         #println("tau: ", curr[:tau])
 
         curr[:rho] = sample_rho(t, g, f, curr, hyperparam)

@@ -6,7 +6,7 @@ include("priors.jl")
 include("proposal_functions.jl")
 include("sampling_functions.jl")
 include("target_functions.jl")
-
+include("simulated_data.jl")
 
 
 function main()
@@ -20,6 +20,8 @@ function main()
     K = 2 #numero di fonti
     n = 32 #numero di siti
     n_time = 30 #365
+    
+    # TODO: standardize altitude!!
     
     # generating simulated data
     sites, dat, theta_true, dat_trials = simulate_data(df, seed, K, n, n_time)

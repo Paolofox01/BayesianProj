@@ -12,17 +12,17 @@ include("utilities.jl")
 #' @param current Named list of current parameter values.
 #' @param hyperparam Named list of hyperparameter values.
 #' @param Sigma_f_inv Inverse covariance matrix of f (n_time x n_time).
-function sample_tau(g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
+function sample_tau(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
     # Proposta del nuovo valore di tau
     proposed = copy(current)
     proposed[:tau]= propose_tau(current[:tau], hyperparam[:tau_proposal_sd])
     
     # Calcolo della likelihood e prior per il valore corrente di tau
-    lik_current = likelihood(g, f, current, Sigma_f, Sigma_f_inv)
+    lik_current = likelihood(t, g, f, current, Sigma_f, Sigma_f_inv)
     prior_current = prior[:tau](current[:tau], hyperparam[:tau_prior_sd])
     
     # Calcolo della likelihood e prior per il valore proposto di tau
-    lik_proposed = likelihood(g, f, proposed, Sigma_f, Sigma_f_inv)
+    lik_proposed = likelihood(t, g, f, proposed, Sigma_f, Sigma_f_inv)
     prior_proposed = prior[:tau](proposed[:tau], hyperparam[:tau_prior_sd])
     
     # Calcolo della probabilità di accettazione
@@ -54,10 +54,10 @@ function sample_rho(t, g, f, current, hyperparam)
     Sigma_f_curr = sq_exp_kernel(t, current[:rho], nugget = 1e-6)
     Sigma_f_curr_inv = inv(Sigma_f_curr)
     
-    lik_current = likelihood(g, f, current, Sigma_f_curr, Sigma_f_curr_inv)
+    lik_current = likelihood(t, g, f, current, Sigma_f_curr, Sigma_f_curr_inv)
     prior_current = prior[:rho](current[:rho], hyperparam[:rho_prior_shape], hyperparam[:rho_prior_scale])
     
-    lik_proposed = likelihood(g, f, proposed, Sigma_f_prop, Sigma_f_prop_inv)
+    lik_proposed = likelihood(t, g, f, proposed, Sigma_f_prop, Sigma_f_prop_inv)
     prior_proposed = prior[:rho](proposed[:rho], hyperparam[:rho_prior_shape], hyperparam[:rho_prior_scale])
     
     prob = exp(lik_proposed + prior_proposed + proposed[:rho] - lik_current - prior_current - current[:rho])
