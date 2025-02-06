@@ -71,8 +71,8 @@ X = sites[:,3:6]
     rho_space = Vector{Any}(undef, K)  # Preallocazione per K
     K_space = Array{Any}(undef, N, N, K)
     for k in 1:K
-        #rho_space[k] ~ Gamma(1, 0.2)
-        rho_space[k] = 0.0024
+        rho_space[k] ~ Gamma(1, 0.2)
+        #rho_space[k] = 0.0024
         K_space[:,:,k] = get_Sigma_gamma(dist, rho_space[k])
     end
     
