@@ -17,12 +17,13 @@ include("target_functions.jl")
 
 
 # Funzione per il fitting del modello RPAGP (Random Process Approximate GP)
-function fit_model(sites, g, n_iter, theta0, hyperparam)
+function fit_model(sites, g, n_iter, theta0, hyperparam, f0_check)
     # Inizializzazione delle catene
     chain = Vector{Any}(undef, n_iter)
     chain_f = Vector{Any}(undef, n_iter)
     chain_g = Vector{Any}(undef, n_iter)
     chain_z = Vector{Any}(undef, n_iter)
+    chain_y = Vector{Any}(undef, n_iter)
     n_time = size(g, 2) #365
     n = size(g, 1) #32
 
@@ -32,12 +33,13 @@ function fit_model(sites, g, n_iter, theta0, hyperparam)
     
 
     # Inizializzazione della prima iterazione della catena
-    chain[1] = copy(theta0)
+    chain[1] = deepcopy(theta0)
+    Sigma_f = sq_exp_kernel(t, chain[1][:rho]) #toeplitz matrix 
+    #Sigma_f_inv = inv(Sigma_f)
+    Sigma_f_inv = trench(Sigma_f) #toeplitz matrix fast inversion
 
-    chain_f[1] = sample_f(g, chain[1], 1)
-    Sigma_f = sq_exp_kernel(t, chain[1][:rho], nugget = 1e-9)
-    Sigma_f_inv = inv(Sigma_f)
-    println(isposdef(Sigma_f))
+    chain_f[1] = sample_f(g, t, chain[1], Sigma_f, Sigma_f_inv)
+    #chain_f[1] = f0_check
 
     chain_g[1] = get_mu_g_matrix(g, chain_f[1], t, chain[1], Sigma_f_inv)
 
@@ -54,42 +56,40 @@ function fit_model(sites, g, n_iter, theta0, hyperparam)
         end
         #println(iter)
 
-        curr = copy(chain[iter - 1])
+        current = deepcopy(chain[iter - 1])
         
+        f = sample_f(g, t, current)
+        #f = f0_check
+
+        current[:tau] = sample_tau(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
         
-        # Campionamento di tau e rho
-        f = sample_f(g, curr, 1)
+
+        #println(current[:phi])
+        current[:beta] = sample_beta(current, Sigma_gamma, X)
         
-        curr[:beta] = sample_beta(curr, hyperparam, Sigma_gamma, X)
-        #println("beta: ", curr[:beta])
+        current[:gamma] = sample_gamma(t, g, f, current,  Sigma_f, Sigma_f_inv, Sigma_gamma, X)
+        
+        current[:phi], Sigma_gamma = sample_phi(dist, X, current, hyperparam)
 
-        curr[:phi], Sigma_gamma = sample_phi(dist, X, curr, hyperparam)
-        #println("phi: ", curr[:phi])
-        #isposdef(Sigma_gamma)
+        current[:rho], Sigma_f, Sigma_f_inv = sample_rho(t, g, f, current, hyperparam)
+       
 
-        curr[:gamma] = sample_gamma(t, g, f, curr,  Sigma_f, Sigma_f_inv, Sigma_gamma, X)
-        #println("gamma: ", curr[:gamma])
+        #Sigma_f = sq_exp_kernel(t, current[:rho])
+        #Sigma_f_inv = inv(Sigma_f)
+        #Sigma_f_inv = trench(Sigma_f)
 
-        curr[:tau] = sample_tau(t, g, f, curr, hyperparam, Sigma_f, Sigma_f_inv)
-        #println("tau: ", curr[:tau])
-
-        curr[:rho] = sample_rho(t, g, f, curr, hyperparam)
-        #println("rho: ", curr[:rho])
-
-        Sigma_f = sq_exp_kernel(t, curr[:rho], nugget = 1e-9)
-        Sigma_f_inv = inv(Sigma_f)
         #println(isposdef(Sigma_f))
         # Aggiornamento di y_hat
-        g_hat = get_mu_g_matrix(g, f, t, curr, Sigma_f_inv)
+        g_hat = get_mu_g_matrix(g, f, t, current, Sigma_f_inv)
         
         # Calcolo dei residui e campionamento dei parametri dei residui
         z = g - g_hat
         
         # Registrazione dei campioni dell'iterazione corrente
-        chain_f[iter] = copy(f)
-        chain[iter] = copy(curr)
-        chain_g[iter] = copy(g_hat)
-        chain_z[iter] = copy(z)
+        chain_f[iter] = deepcopy(f)
+        chain[iter] = deepcopy(current)
+        chain_g[iter] = deepcopy(g_hat)
+        chain_z[iter] = deepcopy(z)
         
         #println(iter, "  ", chain[iter])
         # println(iter, "   ", curr[:rho])

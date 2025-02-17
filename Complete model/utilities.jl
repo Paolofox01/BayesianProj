@@ -1,10 +1,8 @@
 using Distributions, LinearAlgebra, Random, Printf, DataFrames, StatsBase, ToeplitzMatrices
+using FFTW, AbstractFFTs
 
-#' Generate data.
-#'
-#' @param n Number of trials.
-#' @param n_time Number of time points.
-#' @param theta Named list of parameter values.
+
+
 function generate_data(sites, n, K, n_time, theta)
 
     X = sites[:, 3:end] # Design matrix: caratteristiche del sito
@@ -22,8 +20,10 @@ function generate_data(sites, n, K, n_time, theta)
     for k in 1:K
         theta_k = theta[k]
         # Calcola Sigma_f usando la funzione sq_exp_kernel (presupposta definita)
-        Sigma_f = sq_exp_kernel(t, theta_k[:rho]; nugget=1e-6)
-        Sigma_f_inv = inv(Sigma_f)
+        Sigma_f = sq_exp_kernel(t, theta_k[:rho]) 
+        #Sigma_f_inv = inv(Sigma_f)
+        Sigma_f_inv = trench(Sigma_f)
+
         # Genera il vettore f dalla distribuzione normale multivariata con media zero e matrice varianza Sigma_f
         f[k, :] = rand(MvNormal(zeros(n_time), Sigma_f))
          
@@ -32,9 +32,6 @@ function generate_data(sites, n, K, n_time, theta)
         theta_k[:gamma] = gamma[:, k]
         # Loop attraverso ciascuna colonna i
         for i in 1:n
-            # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
-            Sigma_i = get_Sigma_i(i, t, theta_k)
-
             # Calcola mu come Sigma_i * Sigma_f_inv * f
             g[i, k, :] = rand(MultivariateNormal(get_mu_g(i, t, f[k,:], theta_k, Sigma_f_inv) , get_Sigma_g_i(i,t,theta_k,Sigma_f,Sigma_f_inv)))
         end
@@ -52,21 +49,24 @@ end
 #' @param rho Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function sq_exp_kernel(t, rho; alpha=1, nugget=0.0)
-    n_time = length(t)
+function sq_exp_kernel(t, rho; alpha=1)
+    #n_time = length(t)
     # Calcolo dell'esponenziale quadratico
-    K = Matrix{Float64}(undef, n_time, n_time)
+    # K = Matrix{Float64}(undef, n_time, n_time)
 
-    # Popola la matrice K
-    for i in 1:n_time
-        for j in 1:n_time
-            K[i, j] = alpha^2 * exp(- (rho)^2 / 2 * (t[i] - t[j])^2)
-        end
-    end
-    
-    K += nugget .* I(n_time)   
-    K = (K + K')/2
-    
+    # # Popola la matrice K
+    # for i in 1:n_time
+    #     for j in 1:n_time
+    #         K[i, j] = alpha^2 * exp(- (rho)^2 / 2 * (t[i] - t[j])^2)
+    #     end
+    # end
+
+    # Toeplitz matrix
+    K = SymmetricToeplitz(alpha^2 .* exp.(-(rho^2 / 2) .* (range(0, stop=n_time-1, length=n_time)).^2) + [1e-6; zeros(n_time-1)])
+    #K += nugget .* I(n_time)   
+    #K = (K + K')/2
+    #println(isposdef(K))
+    #println(K)
     return K
 end
 
@@ -78,22 +78,19 @@ end
 #' @param phi Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function get_Sigma_gamma(D, phi; alpha=1, nugget=0.1)
+function get_Sigma_gamma(D, phi; alpha=1, nugget=0.0)
     n_stations = size(D, 1)
     # Calcolo dell'esponenziale quadratico
-    K = Matrix{Float64}(undef, n_stations, n_stations)
+    #K = Matrix{Float64}(undef, n_stations, n_stations)
 
     # Popola la matrice K
-    for i in 1:n_stations
-        for j in 1:n_stations
-            K[i, j] = alpha^2 * exp(-phi^2 / 2 * (D[i,j])^2)
-        end
-    end
-    
+    K = alpha^2 .* exp.(- (0.5 * phi^2) .* D.^2)
     K += nugget .* I(n_stations)   
     K = (K + K')/2
-    
-    #println(isposdef(K))
+
+    if !(isposdef(K))
+        println(K)
+    end
 
     return K
 end
@@ -108,7 +105,7 @@ function get_Sigma_i(i, t, theta)
     # Popola la matrice K
     for ii in 1:n_time
         for jj in 1:n_time
-            K[ii, jj] = exp(-theta[:rho]^2 / 2 * (t[ii] - t[jj] - theta[:tau][i])^2)
+            K[ii, jj] = exp(- (theta[:rho]^2 / 2) * (t[ii] - t[jj] - theta[:tau][i])^2)
         end
     end
 
@@ -195,7 +192,7 @@ function get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv)
 
     Sigma_i = get_Sigma_i(i, t, theta)
 
-    K = (exp(theta[:gamma][i])^2) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 0.01 .* I(size(Sigma_f, 1))
+    K = exp(2*theta[:gamma][i]) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 1e-6 .* I(size(Sigma_f, 1))
     # Simmetrizzo
     K  = (K  + K') / 2
 

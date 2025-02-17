@@ -4,87 +4,89 @@ using Distributions, LinearAlgebra
 prior = Dict()
 
 
-#' Prior for tau (latency).
-#'
-#' @param tau tau value.
-#' @param tau_prior_sd SD of prior distribution.
-prior[:tau] = function prior_tau(tau, tau_prior_sd)
-    result = 0.0
-    n = length(tau)
+# prior[:tau] = function prior_tau(tau, hyperparam)
+#     N = length(tau)
+
+#     # Creazione della matrice Sigma
+#     Sigma = hyperparam[:tau_prior_sd]^2 * (I(N) - ones(N,N) * (1 / (N + 1)))
     
-    # Creazione della matrice Sigma
-    Sigma = tau_prior_sd^2 * (I(n) - ones(n, n) * (1 / (n + 1)))
+#     # Definizione della distribuzione normale multivariata
+#     mvn = MvNormal(zeros(N), Sigma)
     
-    # Definizione della distribuzione normale multivariata
-    mvn = MvNormal(zeros(n), Sigma)
+#     # Calcolo del logaritmo della densità
+#     return logpdf(mvn, tau[1:N])
+# end
+
+
+
+prior[:tau_i] = function prior_tau(tau, hyperparam)
+
+    # Definizione della distribuzione normale univariata
+    uvn = Normal(0, hyperparam[:tau_prior_sd])
     
     # Calcolo del logaritmo della densità
-    result += logpdf(mvn, tau[1:n])
-    
-    return result
+    return logpdf(uvn, tau)
 end
 
 
-#' Prior for rho (temporal GP length scale).
-#'
-#' @param rho rho value.
-#' @param rho_prior_shape Shape parameter of prior.
-#' @param rho_prior_scale Scale parameter of prior.
-prior[:rho] = function prior_rho(rho, rho_prior_shape, rho_prior_scale)
-    gamma_dist = Gamma(rho_prior_shape, rho_prior_scale)
+
+prior[:rho] = function prior_rho(rho, hyperparam)
+    # Definizione della distribuzione Gamma
+    gamma_dist = Gamma(hyperparam[:rho_prior_shape], hyperparam[:rho_prior_scale])
     
     # Calcolo del logaritmo della densità della distribuzione Gamma
-    result = logpdf(gamma_dist, rho)
-    
-    return result
+    return logpdf(gamma_dist, rho)
 end
 
 
-#' Prior for phi (spatial GP length scale).
-#'
-#' @param phi phi value.
-#' @param phi_prior_shape Shape parameter of prior.
-#' @param phi_prior_scale Scale parameter of prior.
-prior[:phi] = function prior_phi(phi, phi_prior_shape, phi_prior_scale)
-    gamma_dist = Gamma(phi_prior_shape, phi_prior_scale)
+
+prior[:phi] = function prior_phi(phi, hyperparam)
+    # Definizione della distribuzione Gamma
+    gamma_dist = Gamma(hyperparam[:phi_prior_shape], hyperparam[:phi_prior_scale])
     
     # Calcolo del logaritmo della densità della distribuzione Gamma
-    result = logpdf(gamma_dist, phi)
-    
-    return result
+    return logpdf(gamma_dist, phi)
 end
 
 
-#' Prior for gamma.
-#'
-#' @param gamma gamma value.
-#' @param phi_prior_shape Shape parameter of prior.
-#' @param phi_prior_scale Scale parameter of prior.
-prior[:gamma] = function prior_gamma(gamma, Sigma_gamma, mu_gamma)
-    n = length(gamma)
+
+prior[:gamma] = function prior_gamma(gamma, mu_gamma, Sigma_gamma)
+    N = length(gamma)
     
     # Definizione della distribuzione normale multivariata
     mvn = MvNormal(mu_gamma, Sigma_gamma)
     
     # Calcolo del logaritmo della densità
-    result = logpdf(mvn, gamma[1:n])
-    
-    return result
-
+    return logpdf(mvn, gamma[1:N])
 end
 
 
 
-#' Marginal prior for beta_i.
-#'
-#' @param beta_i beta_i value.
 prior[:beta_i] = function prior_beta_i(beta_i)
      # Definizione della distribuzione normale univariata
-    mvn = Normal(0, 1)
+    uvn = Normal(0, 1)
     
      # Calcolo del logaritmo della densità
-    result = logpdf(mvn, beta_i)
+    return logpdf(uvn, beta_i)
+end
+
+
+
+prior[:h] = function prior_h(h_vec, hyperparam)
+    # Definizione della distribuzione Dirichlet
+    dir = Dirichlet(hyperparam[:prior_h_alpha0])
     
-    return result
+    # Calcolo del logaritmo della densità
+    return logpdf(dir, h_vec)
+end
+
+
+
+prior[:sigma_c] = function prior_sigma_c(sigma_c, hyperparam)
+    # Definizione della distribuzione Inverse Gamma
+    invga_dist = InverseGamma(hyperparam[:prior_sc_a], hyperparam[:prior_sc_b])
+    
+    # Calcolo del logaritmo della densità
+    return logpdf(invga_dist, sigma_c)
 end
 

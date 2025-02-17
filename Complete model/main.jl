@@ -17,15 +17,14 @@ function main()
 
 
     # Parametri
-    K = 2 #numero di fonti
+    K = 2  #numero di fonti
     n = 32 #numero di siti
-    n_time = 30 #365
+    n_time = 40 #365
     C = 6 # numero di inquinanti
     
-    # TODO: standardize altitude!!
     
     # generating simulated data
-    sites, dat, theta_true, dat_trials = simulate_data(df, seed, K, n, C, n_time)
+    sites, dat, theta_true, dat_trials, y_ict, h = simulate_data(df, seed, K, n, C, n_time)
 
     
 
@@ -33,28 +32,32 @@ function main()
 
     # Iperparametri per MCMC
     hyperparam = Dict(
+        # prior
         :tau_prior_sd => sqrt(3), 
-        :tau_proposal_sd => 0.01,
         :rho_prior_shape => 0.02, 
-        :rho_prior_scale => 1,
-        :rho_proposal_sd => 0.01, 
-        #:beta_prior_mu => 0, 
-        #:beta_prior_sd => 1
-        :phi_prior_shape => 0.02,
+        :rho_prior_scale => 1.0,
+        :phi_prior_shape => 0.002,
         :phi_prior_scale => 1.0,
-        :phi_proposal_sd => 0.05,
-        :beta_proposal_sd => 0.1,
-        :gamma_proposal_sd => 0.01
+        :h_prior_alpha0 => 1.0,
+        #proposal
+        :tau_proposal_sd => 0.01,
+        :rho_proposal_sd => 0.005, 
+        :phi_proposal_sd => 0.015,
+        :gamma_proposal_sd => 0.01,
+        :h_proposal_sd => 0.01,
+        :g_proposal_sd => 0.01
     )
     
     #theta0 = Dict{Int64, Dict{Any,Any}}()
     theta0 = Dict(
         :rho => 0.3,
         :phi => 1/500.0,
-        :beta => ones(4),
-        :gamma => (ones(n)), 
-        :tau => zeros(n) 
+        :beta => zeros(4),
+        :gamma => zeros(n), 
+        :tau => zeros(n),
+        :h => ones(C)./C
     )
+
 
 
    
@@ -64,10 +67,15 @@ function main()
 
     # Iterazioni di MCMC
     k = 2
-    n_iter = 300
+    n_iter = 2000
+    #theta0_check = deepcopy(theta_true[k])
+    #theta0_check[:gamma] =  zeros(n)
+
 
     Random.seed!(seed)
-    results = fit_model(sites, dat[:g][:,k,:], n_iter, theta0, hyperparam)
+    results = fit_model(sites, dat[:g][:,k,:], n_iter, theta0, hyperparam, dat[:f][k,:])
+
+
 
     # Funzione per riassumere i risultati MCMC
     burn_in = Int(0.6* n_iter)  # Calcolare il burn-in (primo 60%)
@@ -185,7 +193,7 @@ function main()
 
      p14 = plot()  # Inizializza il grafico
 
-     plot!(1:n_iter, [results[:chain][i][:beta][4] for i in 1:n_iter])
+     plot!(1:n_iter, [results[:chain][i][:beta][2] for i in 1:n_iter])
      
      # Mostra il grafico
      display(p14)
@@ -198,3 +206,125 @@ main()
 
 
 
+# TRACEPLOTS
+burn_in = Int(0.6* n_iter)  # Calcolare il burn-in (primo 60%)
+burn_in = 1
+
+
+
+# betas
+p_beta = Plots.Plot{Plots.GRBackend}[]
+for num in 1:4
+    p_beta_curr = plot()  # Inizializza il grafico
+    plot!(burn_in:n_iter, [results[:chain][i][:beta][num] for i in burn_in:n_iter])
+    plot!([burn_in,n_iter], [theta_true[k][:beta][num], theta_true[k][:beta][num]])
+    push!(p_beta, p_beta_curr)
+end
+plot(p_beta...)
+
+beta_CI = plot()
+plot!(1:4, [median([results[:chain][i][:beta][num] for i in burn_in:n_iter]) for num in 1:4], seriestype=:scatter)
+plot!(1:4, [quantile([results[:chain][i][:beta][num] for i in burn_in:n_iter], 0.975) for num in 1:4], seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:4, [quantile([results[:chain][i][:beta][num] for i in burn_in:n_iter], 0.025) for num in 1:4], seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:4, [theta_true[k][:beta][num] for num in 1:4], seriestype=:scatter, mc=:red)
+
+
+
+
+# rho
+p_rho = plot()  # Inizializza il grafico
+plot!(1:n_iter, [results[:chain][i][:rho] for i in 1:n_iter])
+plot!([1,n_iter], [theta_true[k][:rho], theta_true[k][:rho]])
+
+
+
+# phi
+p_phi = plot()  # Inizializza il grafico
+plot!(burn_in:n_iter, [results[:chain][i][:phi] for i in burn_in:n_iter])
+plot!([burn_in,n_iter], [theta_true[k][:phi], theta_true[k][:phi]])
+
+
+
+
+# gammas
+p_gamma = Plots.Plot{Plots.GRBackend}[]
+for num in 1:n
+    p_gamma_curr = plot()  # Inizializza il grafico
+    plot!(burn_in:n_iter, [results[:chain][i][:gamma][num] for i in burn_in:n_iter])
+    plot!([burn_in,n_iter], [theta_true[k][:gamma][num], theta_true[k][:gamma][num]])
+    push!(p_gamma, p_gamma_curr )
+end
+plot(p_gamma[1:9]...)
+plot(p_gamma[10:18]...)
+plot(p_gamma[19:27]...)
+plot(p_gamma[28:32]...)
+plot(p_gamma[1])
+
+p_gamma = plot()
+plot!(1:n, [median([results[:chain][i][:gamma][num] for i in burn_in:n_iter]) for num in 1:n], seriestype=:scatter)
+plot!(1:n, [quantile([results[:chain][i][:gamma][num] for i in burn_in:n_iter], 0.975) for num in 1:n] , seriestype=:scatter, mc=:blue, ms=1)
+plot!(1:n, [quantile([results[:chain][i][:gamma][num] for i in burn_in:n_iter], 0.025) for num in 1:n] , seriestype=:scatter, mc=:blue, ms=1)
+plot!(1:n, [theta_true[k][:gamma][num] for num in 1:n] , seriestype=:scatter)
+
+
+
+
+# tau
+p_tau = Plots.Plot{Plots.GRBackend}[]
+for num in 1:n
+    p_tau_curr = plot()  # Inizializza il grafico
+    plot!(burn_in:n_iter, [results[:chain][i][:tau][num] for i in burn_in:n_iter])
+    plot!([burn_in,n_iter], [theta_true[k][:tau][num], theta_true[k][:tau][num]])
+    push!(p_tau, p_tau_curr )
+end
+plot(p_tau[1:9]...)
+plot(p_tau[10:18]...)
+plot(p_tau[19:27]...)
+plot(p_tau[28:32]...)
+plot(p_tau[1])
+
+
+
+# f
+p_f = plot()  # Inizializza il grafico
+num = 10
+plot!(burn_in:n_iter, [results[:chain_f][i][num] for i in burn_in:n_iter])
+#plot!([1,n_iter], [dat[:f][num], dat[:f][num]])
+
+p_f = plot()  # Inizializza il grafico
+plot!(1:n_time, [median([results[:chain_f][i][num] for i in burn_in:n_iter]) for num in 1:n_time], linewidth=2, label="f posterior median")
+plot!(1:n_time, [quantile([results[:chain_f][i][num] for i in burn_in:n_iter], 0.025) for num in 1:n_time], linestyle=:dash, linecolor=:blue,  label="f posterior 95% CIs")
+plot!(1:n_time, [quantile([results[:chain_f][i][num] for i in burn_in:n_iter], 0.975) for num in 1:n_time], linestyle=:dash, linecolor=:blue, label=missing)
+plot!(1:n_time, dat[:f][k,:], linecolor=:red,  label="true f")
+
+# standardizzo
+p_f = plot()  # Inizializza il grafico
+f_med = [median([results[:chain_f][i][num] for i in burn_in:n_iter]) for num in 1:n_time]
+plot!(1:n_time, f_med  ./ norm(f_med ,2))
+plot!(1:n_time, [quantile([results[:chain_f][i][num] for i in burn_in:n_iter], 0.025) for num in 1:n_time]./ norm(f_med ,2), linestyle=:dash, linecolor=:blue)
+plot!(1:n_time, [quantile([results[:chain_f][i][num] for i in burn_in:n_iter], 0.975) for num in 1:n_time]./ norm(f_med ,2), linestyle=:dash, linecolor=:blue)
+plot!(1:n_time, dat[:f][k,:]./ norm(dat[:f][k,:] ,2), linecolor=:red)
+# gamma std
+p_gamma = plot()
+plot!(1:n, [median([results[:chain][i][:gamma][num] for i in burn_in:n_iter]) for num in 1:n] .+ log(norm(f_med ,2)), seriestype=:scatter, ms=5)
+plot!(1:n, [quantile([results[:chain][i][:gamma][num] for i in burn_in:n_iter], 0.975) for num in 1:n] .+ log(norm(f_med ,2)), seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:n, [quantile([results[:chain][i][:gamma][num] for i in burn_in:n_iter], 0.025) for num in 1:n] .+ log(norm(f_med ,2)), seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:n, [theta_true[k][:gamma][num] for num in 1:n] .+ log(norm(dat[:f][k,:] ,2)), seriestype=:scatter, mc=:red, ms=3)
+
+
+
+# g 
+p_g = Plots.Plot{Plots.GRBackend}[]
+for staz in 1:n
+    p_g_curr = plot()
+    plot!(1:n_time, [median([results[:chain_g][i][staz, num] for i in burn_in:n_iter]) for num in 1:n_time], label="g_$staz posterior median", linewidth=2)
+    plot!(1:n_time, [quantile([results[:chain_g][i][staz, num] for i in burn_in:n_iter], 0.025) for num in 1:n_time], linestyle=:dash, linecolor=:blue, label="g_$staz posterior 95% CIs")
+    plot!(1:n_time, [quantile([results[:chain_g][i][staz, num] for i in burn_in:n_iter], 0.975) for num in 1:n_time], linestyle=:dash, linecolor=:blue, label=missing)
+    plot!(1:n_time, dat[:g][staz,k,:], linecolor=:red, label="true g_$staz")
+    push!(p_g, p_g_curr)
+end
+
+plot(p_g[1:9]...)
+plot(p_g[10:18]...)
+plot(p_g[19:26]...)
+plot(p_g[1])

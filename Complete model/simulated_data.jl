@@ -2,7 +2,6 @@
 using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV, HDF5
 
 include("utilities.jl")
-include("fit_MCMC.jl")
 include("priors.jl")
 include("proposal_functions.jl")
 include("sampling_functions.jl")
@@ -34,25 +33,25 @@ function simulate_data(df, seed, K, n, C, n_time)
     end
 
     # TODO: standardizzare altitudine
-    sites = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2], intercept = intercept, x1 = x1, x2=x2, ElevationSTD = (df[:, 3].- mean(df[:, 3])) ./ std(df[:, 3])))
+    sites = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2], intercept = intercept, suburban = x1, urban=x2, ElevationSTD = (df[:, 3].- mean(df[:, 3])) ./ std(df[:, 3])))
     
     maximum(euclid_dist(sites[: , 1], sites[: , 2], n))
 
     # Parametri del modello
     theta = Dict{Int64, Dict{Any,Any}}()
     theta[1] = Dict(
-        :rho => 0.5,
+        :rho => 0.15,
         :phi => 1/300.0,
         :gamma => zeros(n),
-        :beta => [-0.5, 0.5, 1., 0.1],
+        :beta => [-0.6, 0.2, 0.5, -0.3],
         :tau => rand(Normal(0, 1), n) 
     )
 
     theta[2] = Dict(
-        :rho => 0.2,
+        :rho => 0.25,
         :phi => 1/400.0,
         :gamma => zeros(n),
-        :beta => [0.3, -0.4, -0.7, -0.2],
+        :beta => [-0.2, 0.4, -0.6, 0.1],
         :tau => rand(Normal(0, 1), n)
     )
 
@@ -61,7 +60,7 @@ function simulate_data(df, seed, K, n, C, n_time)
     dat = generate_data(sites, n, K, n_time, theta)
 
     # salvo i dati simulati per ogni k=1,..,K
-    theta_true = copy(theta)
+    theta_true = deepcopy(theta)
     df_new = Dict{Int64, DataFrame}()
     dat_trials = Dict{Int64, DataFrame}()
     for k in 1:K
@@ -150,6 +149,6 @@ function simulate_data(df, seed, K, n, C, n_time)
     end
     
    
-    return sites, dat, theta_true, dat_trials
+    return sites, dat, theta_true, dat_trials, y_ict, h
 
 end

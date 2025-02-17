@@ -62,8 +62,42 @@ function marginal_gamma_i(i, theta, Sigma_gamma, X)
     Sigma = Sigma_gamma[i, i] - Sigma_gamma[i, 1:end .!= i]' * inv(Sigma_gamma[1:end .!= i, 1:end .!= i]) * Sigma_gamma[1:end .!= i, i]
 
     # Calcolo della log-pdf per la densità multivariata normale
-    mvln = Normal(mu, Sigma)
-    tmp = logpdf(mvln, theta[:gamma][i])
+    uvn = Normal(mu, Sigma)
+    tmp = logpdf(uvn, theta[:gamma][i])
+
+    # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
+    out = tmp == -Inf ? -1e10 : tmp
+    return out
+end
+
+
+
+function target_f(f, Sigma_f)
+    n_time = size(Sigma_f, 1)
+
+    # Calcolo della log-pdf per la densità multivariata normale
+    mvn = MvNormal(zeros(n_time), Sigma_f)
+    tmp = logpdf(mvn, f)
+
+    # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
+    out = tmp == -Inf ? -1e10 : tmp
+    return out
+end
+
+
+
+function likelihood_y(y_ict, g, h, sigma_c)
+    N = size(y_ict, 1)
+    C = size(y_ict, 2)
+    T = size(y_ict, 3)
+    
+    tmp = 0.0
+    for c in 1:C, i in 1:N, t in 1:T
+        mu = g[i,:,t]' * h[c,:]
+        uvn = Normal(mu, sigma_c)
+        tmp += logpdf(uvn, y_ict[i, c, t])
+        # println(i)
+    end
 
     # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
     out = tmp == -Inf ? -1e10 : tmp
