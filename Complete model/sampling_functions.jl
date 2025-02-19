@@ -85,25 +85,21 @@ end
 
 
 
-function sample_f(g, t, theta, Sigma_f, Sigma_f_inv)
-    T = size(g, 2)
-    N = size(g, 1)
-
-    #Sigma_f = sq_exp_kernel(t, theta[:rho])
-    #Sigma_f_inv = inv(Sigma_f)
-    #Sigma_f_inv = trench(Sigma_f)
+function sample_f(tt, theta)
+    N = size(theta[:g], 1)
+    T = size(theta[:g], 2)
     
-    A = Sigma_f_inv
+    A = theta[:Sigma_f_inv]
     b = zeros(T)
         
     for i in 1:N
-        Sigma_g_i = get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv)
-        Sigma_i = get_Sigma_i(i, t, theta)
+        Sigma_g_i = get_Sigma_g_i(i, tt, theta)
+        Sigma_i = get_Sigma_i(i, tt, theta)
         
-        L = Sigma_i * Sigma_f_inv
+        L = Sigma_i * theta[:Sigma_f_inv]
         G = inv(Sigma_g_i) * L
         A += L' * G
-        b += (g[i, :]' * G)[:]
+        b += (theta[:g][i, :]' * G)[:]
     end
 
     Sigma_f_post = inv(A)
@@ -225,7 +221,7 @@ end
 
 
 
-function sample_g_ik(i, t, k, h, g, y_ict, current, sigma_c)
+function sample_g_ik(i, k, tt, y_ict, current, sigma_c)
     T = length(t)
     inv_Sg = inv( get_Sigma_g_i(i, t, current, Sigma_f, Sigma_f_inv) )
     S = inv( sum(h[:,k].^2 ./ sigma_c[1:C]).*I(T) + inv_Sg )

@@ -42,10 +42,12 @@ function simulate_data(df, seed, N, C, T, K)
         :beta => [-0.6, 0.2, 0.5, -0.3],
         :tau => rand(Normal(0, 1), N),
         :gamma => zeros(N),
+        :Sigma_gamma => zeros(N, N),
         :h =>  ones(C)./C,
         :f => zeros(T),
         :g => zeros(N, T),
-        :sigma2_c => zeros(C)
+        :Sigma_f => zeros(T, T),
+        :Sigma_f_inv => zeros(T, T)
     )
 
     theta[2] = Dict(
@@ -54,14 +56,17 @@ function simulate_data(df, seed, N, C, T, K)
         :beta => [-0.2, 0.4, -0.6, 0.1],
         :tau => rand(Normal(0, 1), N),
         :gamma => zeros(N),
+        :Sigma_gamma => zeros(N, N),
         :h =>  ones(C)./C,
         :f => zeros(T),
         :g => zeros(N, T),
-        :sigma2_c => zeros(C)
+        :Sigma_f => zeros(T, T),
+        :Sigma_f_inv => zeros(T, T)
     )
 
     # Funzione per generare i dati (devi definire `generate_data` in Julia)
     dat, theta_true = generate_data(X, coords, theta, N, C, T, K)
+  
 
 
 
@@ -74,13 +79,8 @@ function simulate_data(df, seed, N, C, T, K)
     #     # "Melt" della matrice (equivalente a reshape2::melt in R)
     #     dat_trials[k] = stack(df_new[k], variable_name = "time", value_name = "value")
     #     # Aggiungiamo una colonna per il trial
-    #     dat_trials[k].trial = repeat(1:n,n_time)
+    #     dat_trials[k].trial = repeat(1:n,T)
     # end
-
-
-
-
-
 
 
 
@@ -90,13 +90,13 @@ function simulate_data(df, seed, N, C, T, K)
     p1 = plot()
 
     # Local source contributions (g_ik) per i=1,...,n
-    for i in 1:n
+    for i in 1:N
         # Scegli un colore in base al valore di `n_sources` (o `k`)
-        plot!(p1, 1:n_time, dat[:g][i, k, 1:n_time], linecolor = :red, lw = 1)
+        plot!(p1, 1:T, theta_true[k][:g][i, 1:T], linecolor = :red, lw = 1)
     end
 
     # Aggiungere global source contribution (f)
-    plot!(p1, 1:n_time, dat[:f][k, :], label = "f", linecolor = :black, linewidth = 2)
+    plot!(p1, 1:T, theta_true[k][:f][1:T], label = "f", linecolor = :black, linewidth = 2)
 
     # Specifiche grafiche
     xlabel!(p1, "Time")
@@ -109,13 +109,13 @@ function simulate_data(df, seed, N, C, T, K)
     p2 = plot()
 
     # Local source contributions (g_ik) per i=1,...,n
-    for i in 1:n
+    for i in 1:N
         # Scegli un colore in base al valore di `n_sources` (o `k`)
-        plot!(p2, 1:n_time, dat[:g][i, k, 1:n_time], linecolor = :red, lw = 1)
+        plot!(p2, 1:T, theta_true[k][:g][i, 1:T], linecolor = :red, lw = 1)
     end
 
     # Aggiungere global source contribution (f)
-    plot!(p2, 1:n_time, dat[:f][k, :], label = "f", linecolor = :black, linewidth = 2)
+    plot!(p2, 1:T, theta_true[k][:f][1:T], label = "f", linecolor = :black, linewidth = 2)
 
     # Specifiche grafiche
     xlabel!(p2, "Time")
@@ -123,11 +123,12 @@ function simulate_data(df, seed, N, C, T, K)
     plot!(p2, legend=:false)
     display(p2)
 
+
     for c in 1:C
         @eval $(Symbol(:pyc, c)) = plot()
-        for i in 1:n
+        for i in 1:N
             # Scegli un colore in base al valore di `n_sources` (o `k`)
-            plot!((@eval $(Symbol(:pyc, c))), 1:n_time, y_ict[i, c, 1:n_time], linecolor = :black, lw = 1)
+            plot!((@eval $(Symbol(:pyc, c))), 1:T, dat[:y][i, c, 1:T], linecolor = :black, lw = 1)
         end
         # Specifiche grafiche
         xlabel!((@eval $(Symbol(:pyc, c))), "Time")
@@ -135,8 +136,8 @@ function simulate_data(df, seed, N, C, T, K)
         plot!((@eval $(Symbol(:pyc, c))), legend=:false)
         display(@eval $(Symbol(:pyc, c)))
     end
-    
+
    
-    return sites, dat, theta_true, dat_trials, y_ict, h
+    return dat, theta_true #, dat_trials, y_ict, h
 
 end

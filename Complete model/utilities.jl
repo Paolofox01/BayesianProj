@@ -8,31 +8,27 @@ function generate_data(X, coords, theta, N, C, T, K)
     # Generating time discretization: T days
     tt = range(1, stop=T, length=T)
 
-    #f = zeros(Float64, K, T)
-    #g = zeros(Float64, N, K, T)
-    #gamma = zeros(Float64, N, K)
-
     dist = euclid_dist(coords[:, 1], coords[:, 2], N)
 
     for k in 1:K
         theta_k = theta[k]
 
         # Calcola Sigma_f usando la funzione sq_exp_kernel (presupposta definita)
-        Sigma_f = sq_exp_kernel(tt, theta_k[:rho]) 
-        Sigma_f_inv = trench(Sigma_f)
+        theta_k[:Sigma_f] = sq_exp_kernel(tt, theta_k[:rho]) 
+        theta_k[:Sigma_f_inv] = trench(theta_k[:Sigma_f])
 
         # Genera il vettore f dalla distribuzione normale multivariata con media zero e matrice varianza Sigma_f
-        theta_k[:f] = rand(MvNormal(zeros(T), Sigma_f))
+        theta_k[:f] = rand(MvNormal(zeros(T), theta_k[:Sigma_f]))
         
         # Calcola Sigma_gamma usando la funzione get_Sigma_gamma (presupposta definita)
-        Sigma_gamma = get_Sigma_gamma(dist, theta_k[:phi])
-        theta_k[:gamma] = rand(MvNormal(X*theta_k[:beta], Sigma_gamma))
+        theta_k[:Sigma_gamma] = get_Sigma_gamma(dist, theta_k[:phi])
+        theta_k[:gamma] = rand(MvNormal(X*theta_k[:beta], theta_k[:Sigma_gamma]))
 
         theta_k[:h] = rand(Dirichlet(ones(C)), 1)
 
         # Loop attraverso ciascuna colonna i
         for i in 1:N
-            theta_k[:g][i, :] = rand(MultivariateNormal(get_mu_g(i, tt, theta_k, Sigma_f_inv) , get_Sigma_g_i(i, tt, theta_k, Sigma_f, Sigma_f_inv)))
+            theta_k[:g][i, :] = rand(MultivariateNormal(get_mu_g(i, tt, theta_k) , get_Sigma_g_i(i, tt, theta_k)))
         end
     end
     # TODO: sistemare get_mu_g perchè f è ora in theta
@@ -59,7 +55,7 @@ function generate_data(X, coords, theta, N, C, T, K)
     end
 
     # Restituisce un dizionario contenente le matrici g, f, gamma
-    return Dict(:y => y, :sigma2_c => sigma2_y), theta
+    return Dict(:y => y, :sigma2_c => sigma2_y, :coords => coords, :X => X), theta
 end
 
 
@@ -93,18 +89,14 @@ end
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
 function get_Sigma_gamma(D, phi; alpha=1, nugget=0.0)
-    n_stations = size(D, 1)
+    N = size(D, 1)
     # Calcolo dell'esponenziale quadratico
     #K = Matrix{Float64}(undef, n_stations, n_stations)
 
     # Popola la matrice K
     K = alpha^2 .* exp.(- (0.5 * phi^2) .* D.^2)
-    K += nugget .* I(n_stations)   
+    K += nugget .* I(N)   
     K = (K + K')/2
-
-    if !(isposdef(K))
-        println(K)
-    end
 
     return K
 end
@@ -112,18 +104,17 @@ end
 
 
 
-function get_Sigma_i(i, t, theta)
-    n_time = length(t)
-    K = Matrix{Float64}(undef, n_time, n_time)
+function get_Sigma_i(i, tt, theta)
+    T = length(tt)
+    K = Matrix{Float64}(undef, T, T)
 
     # Popola la matrice K
-    for ii in 1:n_time
-        for jj in 1:n_time
-            K[ii, jj] = exp(- (theta[:rho]^2 / 2) * (t[ii] - t[jj] - theta[:tau][i])^2)
+    for ii in 1:T
+        for jj in 1:T
+            K[ii, jj] = exp(- (theta[:rho]^2 / 2) * (tt[ii] - tt[jj] - theta[:tau][i])^2)
         end
     end
 
-    #return theta[:gamma] .* K
     return K
 end
 
@@ -166,13 +157,13 @@ end
 #' @param theta Named list of parameter values.
 #' @param gamma Vector of values for gamma.
 #' @param Sigma_f_inv Inverse covariance matrix of f.
-function get_mu_g(i, tt, theta, Sigma_f_inv)
+function get_mu_g(i, tt, theta)
     
     # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
     Sigma_i = get_Sigma_i(i, tt, theta)
     
     # Calcola mu come il prodotto Sigma_i * Sigma_f_inv * f
-    mu = exp(theta[:gamma][i]) .* Sigma_i * Sigma_f_inv * theta[:f]
+    mu = exp(theta[:gamma][i]) .* Sigma_i * theta[:Sigma_f_inv] * theta[:f]
     return mu[:,1]
 end
 
@@ -184,13 +175,15 @@ end
 #' @param f Vector of f values.
 #' @param theta Parameter values.
 #' @param Sigma_f_inv Inverse covariance matrix of f (n_time x n_time).
-function get_mu_g_matrix(g, f, t, theta, Sigma_f_inv)
+function get_mu_g_matrix(tt, theta)
     # Inizializza la matrice y_hat con il numero di righe e colonne di y
-    g_hat = Matrix{Float64}(undef, size(g, 1), size(g, 2))
+    N = size(theta[:g], 1)
+    T = size(theta[:g], 2)
+    g_hat = Matrix{Float64}(undef, N, T)
 
     # Popola ogni colonna di y_hat utilizzando la funzione get_mu_g
-    for i in 1:size(g, 1)
-        g_hat[i, :] = get_mu_g(i, t, f, theta, Sigma_f_inv)
+    for i in 1:N
+        g_hat[i, :] = get_mu_g(i, tt, theta)
     end
     
     return g_hat
@@ -202,11 +195,11 @@ end
 #' @param beta_i Trial specific amplitude beta_i
 #' @param Sigma_f Covariance matrix of f. (n_time x n_time)
 #' @param Sigma_nu Covariance AR process (n_time x n_time)
-function get_Sigma_g_i(i, tt, theta, Sigma_f, Sigma_f_inv)
+function get_Sigma_g_i(i, tt, theta) 
 
     Sigma_i = get_Sigma_i(i, tt, theta)
 
-    K = exp(2*theta[:gamma][i]) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 1e-6 .* I(size(Sigma_f, 1))
+    K = exp(2*theta[:gamma][i]) .* (theta[:Sigma_f] - Sigma_i * theta[:Sigma_f_inv] * (Sigma_i)' ) + 1e-6 .* I(size(Sigma_i, 1))
     # Simmetrizzo
     K  = (K  + K') / 2
 

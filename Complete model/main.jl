@@ -24,7 +24,7 @@ function main()
     
     
     # generating simulated data
-    sites, dat, theta_true, dat_trials, y_ict, h = simulate_data(df, seed, K, n, C, n_time)
+    dat, theta_true = simulate_data(df, seed, N, C, T, K) #, dat_trials, y_ict, h
 
     
 
@@ -45,32 +45,30 @@ function main()
         :phi_proposal_sd => 0.015,
         :gamma_proposal_sd => 0.01,
         :h_proposal_sd => 0.01,
-        :g_proposal_sd => 0.01
+        #:g_proposal_sd => 0.01
     )
     
-    #theta0 = Dict{Int64, Dict{Any,Any}}()
-    theta0 = Dict(
-        :rho => 0.3,
-        :phi => 1/500.0,
-        :beta => zeros(4),
-        :gamma => zeros(n), 
-        :tau => zeros(n),
-        :h => ones(C)./C
-    )
-
-
-
-   
-    # Punto e valore fissati (pinned point/value)
-    #pinned_point = div(n_time, 2)  # punto fissato (metà del tempo)
-   # pinned_value = mean(dat[:g][:, 1, pinned_point]) # valore medio della colonna `pinned_point` (in R 'apply(dat$y, 1, mean)[pinned_point]')
+    
+    theta0 = Dict{Int64, Dict{Any,Any}}()
+    for k in 1:K
+        theta0[k] = Dict(
+            :rho => 0.3,
+            :phi => 1/500.0,
+            :beta => zeros(4),
+            :tau => zeros(N),
+            :gamma => zeros(N),
+            :Sigma_gamma => I(N),
+            :h =>  ones(C)./C,
+            :f => zeros(T),
+            :g => zeros(N, T),
+            :Sigma_f => I(T),
+            :Sigma_f_inv => I(T)
+        )
+    end
 
     # Iterazioni di MCMC
-    k = 2
-    n_iter = 2000
-    #theta0_check = deepcopy(theta_true[k])
-    #theta0_check[:gamma] =  zeros(n)
-
+    #k=1
+    n_iter = 20
 
     Random.seed!(seed)
     results = fit_model(sites, dat[:g][:,k,:], n_iter, theta0, hyperparam, dat[:f][k,:])
