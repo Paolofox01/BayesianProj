@@ -3,44 +3,67 @@ using FFTW, AbstractFFTs
 
 
 
-function generate_data(sites, n, K, n_time, theta)
-
-    X = sites[:, 3:end] # Design matrix: caratteristiche del sito
-    coords = sites[:, 1:2] # coordinate geografiche
+function generate_data(X, coords, theta, N, C, T, K)
     
-    # Genera i valori di t
-    t = range(1, stop=n_time, length=n_time)
+    # Generating time discretization: T days
+    tt = range(1, stop=T, length=T)
 
-    f = zeros(Float64, K, n_time)
-    g = zeros(Float64, n, K, n_time)
-    gamma = zeros(Float64, n, K)
+    #f = zeros(Float64, K, T)
+    #g = zeros(Float64, N, K, T)
+    #gamma = zeros(Float64, N, K)
 
-    dist = euclid_dist(coords[:, 1], coords[:, 2], n)
+    dist = euclid_dist(coords[:, 1], coords[:, 2], N)
 
     for k in 1:K
         theta_k = theta[k]
+
         # Calcola Sigma_f usando la funzione sq_exp_kernel (presupposta definita)
-        Sigma_f = sq_exp_kernel(t, theta_k[:rho]) 
-        #Sigma_f_inv = inv(Sigma_f)
+        Sigma_f = sq_exp_kernel(tt, theta_k[:rho]) 
         Sigma_f_inv = trench(Sigma_f)
 
         # Genera il vettore f dalla distribuzione normale multivariata con media zero e matrice varianza Sigma_f
-        f[k, :] = rand(MvNormal(zeros(n_time), Sigma_f))
-         
+        theta_k[:f] = rand(MvNormal(zeros(T), Sigma_f))
+        
+        # Calcola Sigma_gamma usando la funzione get_Sigma_gamma (presupposta definita)
         Sigma_gamma = get_Sigma_gamma(dist, theta_k[:phi])
-        gamma[:, k] = rand(MvNormal(X*theta_k[:beta], Sigma_gamma))
-        theta_k[:gamma] = gamma[:, k]
-        # Loop attraverso ciascuna colonna i
-        for i in 1:n
-            # Calcola mu come Sigma_i * Sigma_f_inv * f
-            g[i, k, :] = rand(MultivariateNormal(get_mu_g(i, t, f[k,:], theta_k, Sigma_f_inv) , get_Sigma_g_i(i,t,theta_k,Sigma_f,Sigma_f_inv)))
-        end
+        theta_k[:gamma] = rand(MvNormal(X*theta_k[:beta], Sigma_gamma))
 
+        theta_k[:h] = rand(Dirichlet(ones(C)), 1)
+
+        # Loop attraverso ciascuna colonna i
+        for i in 1:N
+            theta_k[:g][i, :] = rand(MultivariateNormal(get_mu_g(i, tt, theta_k, Sigma_f_inv) , get_Sigma_g_i(i, tt, theta_k, Sigma_f, Sigma_f_inv)))
+        end
     end
+    # TODO: sistemare get_mu_g perchè f è ora in theta
     
+
+    # Generating the y_ic(t)
+    mu_y = zeros(Float64, N, C, T)
+    y = zeros(Float64, N, C, T)
+    sigma2_y = zeros(Float64, C)
+
+    for i in 1:N
+        for c in 1:C
+            for k in 1:K
+                mu_y[i,c,:] += theta[k][:g][i, :] .* theta[k][:h][c]
+            end
+        end
+    end
+
+    for c in 1:C
+        sigma2_y[c] = (std(mu_y[:,c,:])^2)/10
+        for i in 1:N
+            y[i,c,:] = rand(MultivariateNormal(mu_y[i,c,:], sigma2_y[c].*I(T)), 1)
+        end
+    end
+
     # Restituisce un dizionario contenente le matrici g, f, gamma
-    return Dict(:g => g, :f => f, :gamma => gamma)
+    return Dict(:y => y, :sigma2_c => sigma2_y), theta
 end
+
+
+
 
 
 #' Generate covariance matrix for square exponential kernel.
@@ -49,20 +72,11 @@ end
 #' @param rho Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function sq_exp_kernel(t, rho; alpha=1)
-    #n_time = length(t)
-    # Calcolo dell'esponenziale quadratico
-    # K = Matrix{Float64}(undef, n_time, n_time)
-
-    # # Popola la matrice K
-    # for i in 1:n_time
-    #     for j in 1:n_time
-    #         K[i, j] = alpha^2 * exp(- (rho)^2 / 2 * (t[i] - t[j])^2)
-    #     end
-    # end
+function sq_exp_kernel(tt, rho; alpha=1)
+    T = length(tt)
 
     # Toeplitz matrix
-    K = SymmetricToeplitz(alpha^2 .* exp.(-(rho^2 / 2) .* (range(0, stop=n_time-1, length=n_time)).^2) + [1e-6; zeros(n_time-1)])
+    K = SymmetricToeplitz(alpha^2 .* exp.(-(rho^2 / 2) .* (range(0, stop=T-1, length=T)).^2) + [1e-6; zeros(T-1)])
     #K += nugget .* I(n_time)   
     #K = (K + K')/2
     #println(isposdef(K))
@@ -152,13 +166,13 @@ end
 #' @param theta Named list of parameter values.
 #' @param gamma Vector of values for gamma.
 #' @param Sigma_f_inv Inverse covariance matrix of f.
-function get_mu_g(i, t, f, theta, Sigma_f_inv)
+function get_mu_g(i, tt, theta, Sigma_f_inv)
     
     # Calcola Sigma_i usando la funzione get_Sigma_i (presupposta definita)
-    Sigma_i = get_Sigma_i(i, t, theta)
+    Sigma_i = get_Sigma_i(i, tt, theta)
     
     # Calcola mu come il prodotto Sigma_i * Sigma_f_inv * f
-    mu = exp(theta[:gamma][i]) * Sigma_i * Sigma_f_inv * f
+    mu = exp(theta[:gamma][i]) .* Sigma_i * Sigma_f_inv * theta[:f]
     return mu[:,1]
 end
 
@@ -188,9 +202,9 @@ end
 #' @param beta_i Trial specific amplitude beta_i
 #' @param Sigma_f Covariance matrix of f. (n_time x n_time)
 #' @param Sigma_nu Covariance AR process (n_time x n_time)
-function get_Sigma_g_i(i, t, theta, Sigma_f, Sigma_f_inv)
+function get_Sigma_g_i(i, tt, theta, Sigma_f, Sigma_f_inv)
 
-    Sigma_i = get_Sigma_i(i, t, theta)
+    Sigma_i = get_Sigma_i(i, tt, theta)
 
     K = exp(2*theta[:gamma][i]) .* (Sigma_f - Sigma_i * Sigma_f_inv * (Sigma_i)' ) + 1e-6 .* I(size(Sigma_f, 1))
     # Simmetrizzo

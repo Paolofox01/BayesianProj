@@ -1,5 +1,5 @@
 
-using Random, Plots, DataFrames, StatsBase, ToeplitzMatrices, CSV, HDF5
+using Random, Plots, DataFrames, StatsBase, Distributions, ToeplitzMatrices, CSV, HDF5
 
 include("utilities.jl")
 include("priors.jl")
@@ -8,20 +8,15 @@ include("sampling_functions.jl")
 include("target_functions.jl")
 
 
-function simulate_data(df, seed, K, n, C, n_time)
+function simulate_data(df, seed, N, C, T, K)
     # Impostazione del seed
     Random.seed!(seed)
 
-    # Parametri
-    # K = 2 #numero di fonti
-    # n = 32 #numero di siti
-    # n_time = 30 #365
+    intercept = ones(N)
+    x1 = zeros(N)
+    x2 = zeros(N)
 
-    intercept = ones(n)
-    x1 = zeros(n)
-    x2 = zeros(n)
-
-    for cont in 1:n 
+    for cont in 1:N
         if df[cont, 8] == "SUBURBAN"
             x1[cont] = 1
         end
@@ -32,67 +27,60 @@ function simulate_data(df, seed, K, n, C, n_time)
 
     end
 
-    # TODO: standardizzare altitudine
-    sites = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2], intercept = intercept, suburban = x1, urban=x2, ElevationSTD = (df[:, 3].- mean(df[:, 3])) ./ std(df[:, 3])))
-    
-    maximum(euclid_dist(sites[: , 1], sites[: , 2], n))
+    # Design matrix: sites' territorial characterization
+    X = Matrix(DataFrame(intercept=intercept, suburban=x1, urban=x2, ElevationSTD = (df[:, 3].- mean(df[:, 3])) ./ std(df[:, 3])))
+    # Geographical coordinates: latitude and longitude
+    coords = Matrix(DataFrame(Latitude = df[:, 1], Longitude = df[:, 2]))  
+    maximum(euclid_dist(coords[: , 1], coords[: , 2], N))
+
 
     # Parametri del modello
     theta = Dict{Int64, Dict{Any,Any}}()
     theta[1] = Dict(
         :rho => 0.15,
         :phi => 1/300.0,
-        :gamma => zeros(n),
         :beta => [-0.6, 0.2, 0.5, -0.3],
-        :tau => rand(Normal(0, 1), n) 
+        :tau => rand(Normal(0, 1), N),
+        :gamma => zeros(N),
+        :h =>  ones(C)./C,
+        :f => zeros(T),
+        :g => zeros(N, T),
+        :sigma2_c => zeros(C)
     )
 
     theta[2] = Dict(
         :rho => 0.25,
         :phi => 1/400.0,
-        :gamma => zeros(n),
         :beta => [-0.2, 0.4, -0.6, 0.1],
-        :tau => rand(Normal(0, 1), n)
+        :tau => rand(Normal(0, 1), N),
+        :gamma => zeros(N),
+        :h =>  ones(C)./C,
+        :f => zeros(T),
+        :g => zeros(N, T),
+        :sigma2_c => zeros(C)
     )
 
-
     # Funzione per generare i dati (devi definire `generate_data` in Julia)
-    dat = generate_data(sites, n, K, n_time, theta)
+    dat, theta_true = generate_data(X, coords, theta, N, C, T, K)
+
+
 
     # salvo i dati simulati per ogni k=1,..,K
-    theta_true = deepcopy(theta)
-    df_new = Dict{Int64, DataFrame}()
-    dat_trials = Dict{Int64, DataFrame}()
-    for k in 1:K
-        theta_true[k][:gamma] = dat[:gamma][:,k]
-        df_new[k] = DataFrame(dat[:g][:, k, :], :auto)
-        # "Melt" della matrice (equivalente a reshape2::melt in R)
-        dat_trials[k] = stack(df_new[k], variable_name = "time", value_name = "value")
-        # Aggiungiamo una colonna per il trial
-        dat_trials[k].trial = repeat(1:n,n_time)
-    end
+    # df_new = Dict{Int64, DataFrame}()
+    # dat_trials = Dict{Int64, DataFrame}()
+    # for k in 1:K
+    #     theta_true[k][:gamma] = dat[:gamma][:,k]
+    #     df_new[k] = DataFrame(dat[:g][:, k, :], :auto)
+    #     # "Melt" della matrice (equivalente a reshape2::melt in R)
+    #     dat_trials[k] = stack(df_new[k], variable_name = "time", value_name = "value")
+    #     # Aggiungiamo una colonna per il trial
+    #     dat_trials[k].trial = repeat(1:n,n_time)
+    # end
 
-    #generate the h_kc
-    Random.seed!(seed)
-    h = rand(Dirichlet(ones(C)), K) # C x K matrix
 
-    # Generating the y_ic(t)
-    mu_y_ict = zeros(Float64, n, C, n_time)
-    y_ict = zeros(Float64, n, C, n_time)
-    for i in 1:n
-        for c in 1:C
-            for k in 1:K
-                mu_y_ict[i,c,:] += dat[:g][i, k, :] .* h[c,k]
-            end
-        end
-    end
-    sigma2_y = zeros(Float64, C)
-    for c in 1:C
-        sigma2_y[c] = (std(mu_y_ict[:,c,:])^2)/10
-        for i in 1:n
-            y_ict[i,c,:] = rand(MultivariateNormal(mu_y_ict[i,c,:], sigma2_y[c].*I(n_time)), 1)
-        end
-    end
+
+
+
 
 
 

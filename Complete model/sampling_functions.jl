@@ -221,3 +221,19 @@ function sample_h_k(k, y_ict, g, h, sigma_c, hyperparam)
         return h
     end
 end
+
+
+
+
+function sample_g_ik(i, t, k, h, g, y_ict, current, sigma_c)
+    T = length(t)
+    inv_Sg = inv( get_Sigma_g_i(i, t, current, Sigma_f, Sigma_f_inv) )
+    S = inv( sum(h[:,k].^2 ./ sigma_c[1:C]).*I(T) + inv_Sg )
+    S = (S+S')/2
+    m = inv_Sg' * get_mu_g(i,t,f,current,Sigma_f_inv) 
+    for c in 1:C
+        m += sum( h[c,k] / sigma_c[c] .* (y_ict[i,c,:] - g[i,:,:].*h[:,c]) )
+    end
+    m = S' * m
+    return rand(MultivariateNormal(m, S))
+end

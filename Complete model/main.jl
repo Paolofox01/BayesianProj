@@ -18,8 +18,8 @@ function main()
 
     # Parametri
     K = 2  #numero di fonti
-    n = 32 #numero di siti
-    n_time = 40 #365
+    N = 32 #numero di siti
+    T = 40 #365
     C = 6 # numero di inquinanti
     
     
