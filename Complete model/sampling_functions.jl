@@ -4,45 +4,19 @@ include("utilities.jl")
 include("proposal_functions.jl")
 
 
-# function sample_tau(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
-#     # Proposta del nuovo valore di tau
-#     proposed = deepcopy(current)
-#     proposed[:tau]= propose_tau(current[:tau], hyperparam[:tau_proposal_sd])
-    
-#     # Calcolo della likelihood e prior per il valore corrente di tau
-#     lik_current = likelihood(t, g, f, current, Sigma_f, Sigma_f_inv)
-#     prior_current = prior[:tau](current[:tau], hyperparam[:tau_prior_sd])
-    
-#     # Calcolo della likelihood e prior per il valore proposto di tau
-#     lik_proposed = likelihood(t, g, f, proposed, Sigma_f, Sigma_f_inv)
-#     prior_proposed = prior[:tau](proposed[:tau], hyperparam[:tau_prior_sd])
-    
-#     # Calcolo della probabilità di accettazione
-#     prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
-    
-#     # Decisione sulla proposta in base alla probabilità
-#     if prob > rand()
-#         return proposed[:tau]
-#     else
-#         return current[:tau]
-#     end
-# end
 
-
-
-function sample_tau(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
-    
-    N = size(g, 1)
-    curr = deepcopy(current)
+function sample_tau_k(k, tt, current, hyperparam)
+    curr = deepcopy(current[k])
+    N = length(curr[:tau])
 
     for i in 1:N
         proposed = deepcopy(curr)
         proposed[:tau][i] = propose_tau_i(curr[:tau][i], hyperparam)
 
-        lik_current = target_g_i(i, t, g, f, curr, Sigma_f, Sigma_f_inv)
+        lik_current = target_g_i(i, tt, curr)
         prior_current = prior[:tau_i](curr[:tau][i], hyperparam)
         
-        lik_proposed = target_g_i(i, t, g, f, proposed, Sigma_f, Sigma_f_inv)
+        lik_proposed = target_g_i(i, tt, proposed)
         prior_proposed = prior[:tau_i](proposed[:tau][i], hyperparam)
         
         prob = exp(lik_proposed + prior_proposed - lik_current - prior_current)
@@ -57,28 +31,28 @@ end
 
 
 
-function sample_rho(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
-    n_time = size(g, 2)
+function sample_rho_k(k, tt, current, hyperparam)
+    T = length(tt)
     
-    proposed = deepcopy(current)
-    proposed[:rho] = exp( propose_log_rho(log(current[:rho]), hyperparam) )
-    Sigma_f_prop = sq_exp_kernel(t, proposed[:rho])
+    proposed = deepcopy(current[k])
+    proposed[:rho] = exp( propose_log_rho(log(current[k][:rho]), hyperparam) )
+    proposed[:Sigma_f] = sq_exp_kernel(tt, proposed[:rho])
     #Sigma_f_prop_inv = inv(Sigma_f_prop)
-    Sigma_f_prop_inv = trench(Sigma_f_prop)
+    proposed[:Sigma_f_inv] = trench(proposed[:Sigma_f])
 
     
-    lik_current = likelihood(t, g, f, current, Sigma_f, Sigma_f_inv) + target_f(f, Sigma_f_curr)
-    prior_current = prior[:rho](current[:rho], hyperparam) + log(current[:rho])
+    lik_current = likelihood(tt, current) + target_f(current[:f], current[:Sigma_f])
+    prior_current = prior[:rho](current[k][:rho], hyperparam) + log(current[k][:rho])
     
-    lik_proposed = likelihood(t, g, f, proposed, Sigma_f_prop, Sigma_f_prop_inv) + target_f(f, Sigma_f_prop)
+    lik_proposed = likelihood(tt, proposed) + target_f(proposed[:f], proposed[:Sigma_f])
     prior_proposed = prior[:rho](proposed[:rho], hyperparam) + log(proposed[:rho])
     
     prob = exp( lik_proposed + prior_proposed  - lik_current - prior_current )
     
     if prob > rand()
-        return proposed[:rho], Sigma_f_prop, Sigma_f_prop_inv
+        return proposed[:rho], proposed[:Sigma_f], proposed[:Sigma_f_inv]
     else
-        return current[:rho], Sigma_f_curr, Sigma_f_curr_inv
+        return current[:rho], current[:Sigma_f], current[:Sigma_f_inv]
     end
 end
 
@@ -111,7 +85,7 @@ end
 
 
 
-function sample_gamma(t, g, f, current,  Sigma_f, Sigma_f_inv, Sigma_gamma, X)
+function sample_gamma(tt, current, X)
     N = size(g, 1)
     curr = deepcopy(current)
 

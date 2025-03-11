@@ -40,7 +40,9 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
         chain[1][k][:g] = get_mu_g_matrix(tt, chain[1][k])
         chain[1][k][:Sigma_gamma] = get_Sigma_gamma(dist, chain[1][k][:phi])
     end 
-
+    
+    #chain_y[1] = sample_y(...)   #to be defined
+    #chain[1][sigma_c][...] = sample_sigma_c
     
     start = time()
     # Iterazioni
@@ -52,30 +54,30 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
 
         current = deepcopy(chain[iter - 1])
         
-        current[k][:f] = sample_f(tt, current)
-        current[k][:tau] = sample_tau(t, g, f, current, hyperparam, Sigma_f, Sigma_f_inv)
-        
-        #println(current[:phi])
-        current[k][:beta] = sample_beta(current, Sigma_gamma, X)
-        current[k][:gamma] = sample_gamma(t, g, f, current,  Sigma_f, Sigma_f_inv, Sigma_gamma, X)
-        current[k][:phi], current[k][:Sigma_gamma] = sample_phi(dist, X, current, hyperparam)
-        current[k][:rho], current[k][:Sigma_f], current[k][:Sigma_f_inv] = sample_rho(t, g, f, current, hyperparam)
-       
+        for k in 1:K
+            current[k][:f] = sample_f_k(k, tt, current)
+            current[k][:tau] = sample_tau_k(k, tt, current, hyperparam)
+            #println(current[:phi])
+            current[k][:beta] = sample_beta_k(k, current, dat[:X])
+            current[k][:gamma] = sample_gamma_k(k, tt, current, dat[:X])
+            current[k][:phi], current[k][:Sigma_gamma] = sample_phi_k(k, dist, dat[:X], current, hyperparam)
+            current[k][:rho], current[k][:Sigma_f], current[k][:Sigma_f_inv] = sample_rho_k(k, tt, current, hyperparam)
+            current[k][:h] = sample_h_k(k, y_ict, sigma_c, hyperparam)
+            for i in 1:N
+                current[k][:g][i,:] = sample_g_ik(i, k, tt, y_ict, current, sigma_c)
+            end
+        end
 
+        #chain_y[iter] = sample_y(current, chain_sigma2, ..)
 
-        #println(isposdef(Sigma_f))
-        # Aggiornamento di y_hat
-        g_hat = get_mu_g_matrix(g, f, t, current, Sigma_f_inv)
+        for c in 1:C
+            chain_sigma2[iter] = sample_sigma_c(c, current, y_ict, hyperparam)
+        end
         
-        # Calcolo dei residui e campionamento dei parametri dei residui
-        z = g - g_hat
         
         # Registrazione dei campioni dell'iterazione corrente
         chain[iter] = copy(current)
-        chain_z[iter] = copy(z)
-        
-        #println(iter, "  ", chain[iter])
-        # println(iter, "   ", curr[:rho])
+        #chain_y[iter] = get_y(....) # to be defined
     end
 
     
