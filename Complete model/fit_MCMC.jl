@@ -21,7 +21,7 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
     # Inizializzazione delle catene
     chain = Vector{Any}(undef, n_iter)
     chain_y = Vector{Any}(undef, n_iter)
-    chain_sigma2 = Vector{Any}(undef, n_iter)
+    chain_sigma_c = Vector{Any}(undef, n_iter)
 
     N = size(dat[:y], 1) #32
     C = size(dat[:y], 2) #6
@@ -32,17 +32,20 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
 
     # Inizializzazione della prima iterazione della catena
     chain[1] = deepcopy(theta0)
+    chain_sigma_c[1] = zeros(C)
+    for c in 1:C
+        chain_sigma_c[1][c] = std(dat[:y][:,c,:])
+    end
 
     for k in 1:K
         chain[1][k][:Sigma_f] = sq_exp_kernel(tt, chain[1][k][:rho]) #toeplitz matrix 
         chain[1][k][:Sigma_f_inv] = trench(chain[1][k][:Sigma_f])    #toeplitz matrix fast inversion
-        chain[1][k][:f] = sample_f(tt, chain[1][k])
+        chain[1][k][:f] = sample_f_k(tt, chain[1][k])
         chain[1][k][:g] = get_mu_g_matrix(tt, chain[1][k])
         chain[1][k][:Sigma_gamma] = get_Sigma_gamma(dist, chain[1][k][:phi])
     end 
     
-    #chain_y[1] = sample_y(...)   #to be defined
-    #chain[1][sigma_c][...] = sample_sigma_c
+    chain_y[1] = sample_y_post(chain[1], chain_sigma_c[1], N, C, T)
     
     start = time()
     # Iterazioni
@@ -53,31 +56,29 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
         #println(iter)
 
         current = deepcopy(chain[iter - 1])
-        
+        chain_sigma_c[iter] = zeros(C)
+        for c in 1:C
+            chain_sigma_c[iter][c] = sample_sigma_c(c, current, dat[:y], hyperparam)
+        end
+
         for k in 1:K
-            current[k][:f] = sample_f_k(k, tt, current)
-            current[k][:tau] = sample_tau_k(k, tt, current, hyperparam)
+            current[k][:f] = sample_f_k(tt, current[k])
+            current[k][:tau] = sample_tau_k(tt, current[k], hyperparam)
             #println(current[:phi])
-            current[k][:beta] = sample_beta_k(k, current, dat[:X])
-            current[k][:gamma] = sample_gamma_k(k, tt, current, dat[:X])
-            current[k][:phi], current[k][:Sigma_gamma] = sample_phi_k(k, dist, dat[:X], current, hyperparam)
-            current[k][:rho], current[k][:Sigma_f], current[k][:Sigma_f_inv] = sample_rho_k(k, tt, current, hyperparam)
-            current[k][:h] = sample_h_k(k, y_ict, sigma_c, hyperparam)
+            current[k][:beta] = sample_beta_k(current[k], dat[:X])
+            current[k][:gamma] = sample_gamma_k(tt, current[k], dat[:X])
+            current[k][:phi], current[k][:Sigma_gamma] = sample_phi_k(dist, dat[:X], current[k], hyperparam)
+            current[k][:rho], current[k][:Sigma_f], current[k][:Sigma_f_inv] = sample_rho_k(tt, current[k], hyperparam)
+            current[k][:h] = sample_h_k(k, dat[:y], chain_sigma_c[iter], current, hyperparam)
             for i in 1:N
-                current[k][:g][i,:] = sample_g_ik(i, k, tt, y_ict, current, sigma_c)
+                current[k][:g][i,:] = sample_g_ik(i, k, tt, dat[:y], current, chain_sigma_c[iter])
             end
         end
-
-        #chain_y[iter] = sample_y(current, chain_sigma2, ..)
-
-        for c in 1:C
-            chain_sigma2[iter] = sample_sigma_c(c, current, y_ict, hyperparam)
-        end
+        chain[iter] = copy(current)
         
         
         # Registrazione dei campioni dell'iterazione corrente
-        chain[iter] = copy(current)
-        #chain_y[iter] = get_y(....) # to be defined
+        chain_y[iter] = sample_y_post(current, chain_sigma_c[iter], N, C, T)
     end
 
     
@@ -90,9 +91,8 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
     # Restituzione del risultato come dizionario
     return Dict(
         :chain => chain,
-        :chain_f => chain_f,
-        :chain_g => chain_g,
-        :chain_z => chain_z,
+        :chain_y => chain_y,
+        :chain_sigma_c => chain_sigma_c,
         :runtime => runtime
     )
 end

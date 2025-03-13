@@ -55,7 +55,7 @@ function generate_data(X, coords, theta, N, C, T, K)
     end
 
     # Restituisce un dizionario contenente le matrici g, f, gamma
-    return Dict(:y => y, :sigma2_c => sigma2_y, :coords => coords, :X => X), theta
+    return tt, Dict(:y => y, :sigma2_c => sigma2_y, :coords => coords, :X => X), theta
 end
 
 
@@ -88,16 +88,15 @@ end
 #' @param phi Length scale.
 #' @param alpha Amplitude.
 #' @param nugget Covariance nugget.
-function get_Sigma_gamma(D, phi; alpha=1, nugget=0.0)
+function get_Sigma_gamma(D, phi; alpha=1, nugget=1e-6)
     N = size(D, 1)
     # Calcolo dell'esponenziale quadratico
-    #K = Matrix{Float64}(undef, n_stations, n_stations)
-
-    # Popola la matrice K
     K = alpha^2 .* exp.(- (0.5 * phi^2) .* D.^2)
     K += nugget .* I(N)   
     K = (K + K')/2
-
+    if !isposdef(K)
+        println(K)
+    end
     return K
 end
 

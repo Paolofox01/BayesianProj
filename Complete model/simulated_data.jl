@@ -65,7 +65,7 @@ function simulate_data(df, seed, N, C, T, K)
     )
 
     # Funzione per generare i dati (devi definire `generate_data` in Julia)
-    dat, theta_true = generate_data(X, coords, theta, N, C, T, K)
+    tt, dat, theta_true = generate_data(X, coords, theta, N, C, T, K)
   
 
 
@@ -138,6 +138,6 @@ function simulate_data(df, seed, N, C, T, K)
     end
 
    
-    return dat, theta_true #, dat_trials, y_ict, h
+    return tt, dat, theta_true #, dat_trials, y_ict, h
 
 end
