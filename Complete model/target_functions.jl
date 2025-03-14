@@ -82,7 +82,7 @@ end
 
 
 
-function likelihood_y(y_ict, theta, sigma_c)
+function likelihood_y(y_ict, theta, sigma2_c)
     N = size(y_ict, 1)
     C = size(y_ict, 2)
     T = size(y_ict, 3)
@@ -93,7 +93,7 @@ function likelihood_y(y_ict, theta, sigma_c)
         for k in 1:K
             mu += theta[k][:g][i,t] .* theta[k][:h][c]
         end
-        uvn = Normal(mu, sigma_c[c])
+        uvn = Normal(mu, sqrt(sigma2_c[c]))
         tmp += logpdf(uvn, y_ict[i, c, t])
     end
 

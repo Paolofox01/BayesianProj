@@ -21,7 +21,7 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
     # Inizializzazione delle catene
     chain = Vector{Any}(undef, n_iter)
     chain_y = Vector{Any}(undef, n_iter)
-    chain_sigma_c = Vector{Any}(undef, n_iter)
+    chain_sigma2_c = Vector{Any}(undef, n_iter)
 
     N = size(dat[:y], 1) #32
     C = size(dat[:y], 2) #6
@@ -32,9 +32,9 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
 
     # Inizializzazione della prima iterazione della catena
     chain[1] = deepcopy(theta0)
-    chain_sigma_c[1] = zeros(C)
+    chain_sigma2_c[1] = zeros(C)
     for c in 1:C
-        chain_sigma_c[1][c] = std(dat[:y][:,c,:])
+        chain_sigma2_c[1][c] = var(dat[:y][:,c,:])
     end
 
     for k in 1:K
@@ -45,7 +45,7 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
         chain[1][k][:Sigma_gamma] = get_Sigma_gamma(dist, chain[1][k][:phi])
     end 
     
-    chain_y[1] = sample_y_post(chain[1], chain_sigma_c[1], N, C, T)
+    chain_y[1] = sample_y_post(chain[1], chain_sigma2_c[1], N, C, T)
     
     start = time()
     # Iterazioni
@@ -56,9 +56,9 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
         #println(iter)
 
         current = deepcopy(chain[iter - 1])
-        chain_sigma_c[iter] = zeros(C)
+        chain_sigma2_c[iter] = zeros(C)
         for c in 1:C
-            chain_sigma_c[iter][c] = sample_sigma_c(c, current, dat[:y], hyperparam)
+            chain_sigma2_c[iter][c] = sample_sigma2_c(c, current, dat[:y], hyperparam)
         end
 
         for k in 1:K
@@ -69,16 +69,16 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
             current[k][:gamma] = sample_gamma_k(tt, current[k], dat[:X])
             current[k][:phi], current[k][:Sigma_gamma] = sample_phi_k(dist, dat[:X], current[k], hyperparam)
             current[k][:rho], current[k][:Sigma_f], current[k][:Sigma_f_inv] = sample_rho_k(tt, current[k], hyperparam)
-            current[k][:h] = sample_h_k(k, dat[:y], chain_sigma_c[iter], current, hyperparam)
+            current[k][:h] = sample_h_k(k, dat[:y], chain_sigma2_c[iter], current, hyperparam)
             for i in 1:N
-                current[k][:g][i,:] = sample_g_ik(i, k, tt, dat[:y], current, chain_sigma_c[iter])
+                current[k][:g][i,:] = sample_g_ik(i, k, tt, dat[:y], current, chain_sigma2_c[iter])
             end
         end
         chain[iter] = copy(current)
         
         
         # Registrazione dei campioni dell'iterazione corrente
-        chain_y[iter] = sample_y_post(current, chain_sigma_c[iter], N, C, T)
+        chain_y[iter] = sample_y_post(current, chain_sigma2_c[iter], N, C, T)
     end
 
     
@@ -92,7 +92,7 @@ function fit_model(tt, K, dat, theta0, n_iter, hyperparam)
     return Dict(
         :chain => chain,
         :chain_y => chain_y,
-        :chain_sigma_c => chain_sigma_c,
+        :chain_sigma2_c => chain_sigma2_c,
         :runtime => runtime
     )
 end

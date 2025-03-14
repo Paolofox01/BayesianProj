@@ -153,7 +153,7 @@ end
 
 
 
-function sample_sigma_c(c, current, y_ict, hyperparam)
+function sample_sigma2_c(c, current, y_ict, hyperparam)
     N = size(y_ict, 1)
     T = size(y_ict, 3)
     K = length(current)     #number of entries in the dictionary
@@ -221,14 +221,14 @@ end
 
 
 
-function sample_y_post(current, sigma_c, N, C, T)
+function sample_y_post(current, sigma2_c, N, C, T)
     y_out = zeros(Float64, N, C, T)
     for c in 1:C, i in 1:N
         y_mean = zeros(T)
         for k in 1:K
             y_mean += current[k][:g][i,:] .* current[k][:h][c]
         end
-        y_out[i,c,:] = rand(MultivariateNormal(y_mean, sigma_c[c].^2 .* I(T)))
+        y_out[i,c,:] = rand(MultivariateNormal(y_mean, sigma2_c[c] .* I(T)))
     end
 
     return y_out

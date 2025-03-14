@@ -70,7 +70,7 @@ function main()
 
     # Iterazioni di MCMC
     #k=1
-    n_iter = 2000
+    n_iter = 200
 
     Random.seed!(seed)
     results = fit_model(tt, K, dat, theta0, n_iter, hyperparam)
@@ -219,7 +219,7 @@ p_beta = Plots.Plot{Plots.GRBackend}[]
 for num in 1:4
     p_beta_curr = plot()  # Inizializza il grafico
     plot!(burn_in:n_iter, [results[:chain][i][k][:beta][num] for i in burn_in:n_iter])
-    plot!([burn_in,n_iter], [theta_true[k][:beta][num], theta_true[k][:beta][num]])
+    #plot!([burn_in,n_iter], [theta_true[k][:beta][num], theta_true[k][:beta][num]])
     push!(p_beta, p_beta_curr)
 end
 plot(p_beta...)
@@ -320,7 +320,7 @@ for staz in 1:N
     plot!(1:T, [median([results[:chain][i][k][:g][staz, num] for i in burn_in:n_iter]) for num in 1:T], label="g_$staz posterior median", linewidth=2)
     plot!(1:T, [quantile([results[:chain][i][k][:g][staz, num] for i in burn_in:n_iter], 0.025) for num in 1:T], linestyle=:dash, linecolor=:blue, label="g_$staz posterior 95% CIs")
     plot!(1:T, [quantile([results[:chain][i][k][:g][staz, num] for i in burn_in:n_iter], 0.975) for num in 1:T], linestyle=:dash, linecolor=:blue, label=missing)
-    plot!(1:T, theta_true[1][:g][staz,:], linecolor=:red, label="true g_$staz")
+    plot!(1:T, theta_true[k][:g][staz,:], linecolor=:red, label="true g_$staz")
     push!(p_g, p_g_curr)
 end
 
@@ -353,22 +353,22 @@ plot!(1:C, [theta_true[k][:h][num] for num in 1:C], seriestype=:scatter, mc=:red
 p_sigma = Plots.Plot{Plots.GRBackend}[]
 for num in 1:C
     p_sigma_curr = plot()  # Inizializza il grafico
-    plot!(burn_in:n_iter, [results[:chain_sigma_c][i][num] for i in burn_in:n_iter])
-    plot!([burn_in,n_iter], [sqrt(dat[:sigma2_c][num]),sqrt(dat[:sigma2_c][num])])
+    plot!(burn_in:n_iter, [results[:chain_sigma2_c][i][num] for i in burn_in:n_iter])
+    plot!([burn_in,n_iter], [dat[:sigma2_c][num],dat[:sigma2_c][num]])
     push!(p_sigma, p_sigma_curr)
 end
 plot(p_sigma...)
 
 sigma_CI = plot()
-plot!(1:C, [median([results[:chain_sigma_c][i][num] for i in burn_in:n_iter]) for num in 1:C], seriestype=:scatter)
-plot!(1:C, [quantile([results[:chain_sigma_c][i][num] for i in burn_in:n_iter], 0.975) for num in 1:C], seriestype=:scatter, mc=:blue, ms=2)
-plot!(1:C, [quantile([results[:chain_sigma_c][i][num] for i in burn_in:n_iter], 0.025) for num in 1:C], seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:C, [median([results[:chain_sigma2_c][i][num] for i in burn_in:n_iter]) for num in 1:C], seriestype=:scatter)
+plot!(1:C, [quantile([results[:chain_sigma2_c][i][num] for i in burn_in:n_iter], 0.975) for num in 1:C], seriestype=:scatter, mc=:blue, ms=2)
+plot!(1:C, [quantile([results[:chain_sigma2_c][i][num] for i in burn_in:n_iter], 0.025) for num in 1:C], seriestype=:scatter, mc=:blue, ms=2)
 plot!(1:C, [sqrt(dat[:sigma2_c][num]) for num in 1:C], seriestype=:scatter, mc=:red)
 
 
 
 # y
-staz = 30 #selct station 1:32
+staz = 10 #selct station 1:32
 p_y = Plots.Plot{Plots.GRBackend}[]
 for comp in 1:C
     p_y_curr = plot()
