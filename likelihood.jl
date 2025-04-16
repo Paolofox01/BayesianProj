@@ -24,7 +24,7 @@ function likelihood(g, f, theta, K_f, K_f_inv)
         tmp += logpdf(mvn, g[i, :])
         # println(i)
     end
-
+#aaaaaa
     
 
     # Restituisce -1e10 se il risultato è -Inf, altrimenti restituisce tmp
